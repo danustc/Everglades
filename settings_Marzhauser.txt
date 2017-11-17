@@ -78,7 +78,7 @@ devices:
     camera:
         manufacturer: hamamatsu
         model: orcaflash
-        active: false 
+        active: true 
         settings:
             temperature: 20
             exposure_time: 0.2        # in milliseconds
@@ -163,9 +163,9 @@ modules:
     testing:
         active: false
         settings: null
-    adaptiveOptics:
-        active: false 
-        settings: {filename: psfm01.npy, nFrames: 2, nIterations: 4, nSlices: 31, range: 9.0, hasSLM: false, hasMirror: true}
+    AO_imaging:
+        active: true 
+        settings: {filename: psfm01.npy, nFrames: 2, nIterations: 4, nSlices: 31, range: 9.0, hasSLM: false, hasMirror: true, scan_device: marzhauser}
     piezoscan:
         active: true 
         settings:
