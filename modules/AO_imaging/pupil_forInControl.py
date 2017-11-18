@@ -8,7 +8,6 @@ import tempfile as _tempfile
 #from Utilities import zernike as _zernike
 from matplotlib.pylab import *
 import pyfftw
-#from scipy import weave
 
 
 class Pupil(object):
@@ -74,96 +73,6 @@ class Pupil(object):
         g = 2*_np.pi*coverslip_tilt_direction/360.
         ng = 1.5255 # Coverslip refractive index
 
-        def compute_pupil_function(z):
-            phase = (2*_np.pi*n*(_msqrt(f**2*(1+m**2)-z**2)-m*z))/ \
-                    (l*_msqrt(1+m**2))
-            if coverslip_tilt != 0:
-                # Angle between ray and coverslip normal:
-                d = _np.arccos(_np.sin(a)*_np.sin(e) * \
-                        (_np.cos(t)*_np.cos(g)+_np.sin(t)*_np.sin(g)) + \
-                        _np.cos(a)*_np.cos(e))
-                # Path length through coverslip:
-                p = d/_np.sqrt(1+(n*_np.sin(d)/ng)**2)
-                # The correction collar takes care of none tilt based differences:
-                p -= d/_np.sqrt(1+(n*_np.sin(a)/ng)**2)
-                # Path length to phase conversion:
-                p *= ng*2*_np.pi/l
-                phase += p
-            PF = _np.sqrt(n_photons/self.pupil_npxl)*_np.exp(1j*phase)
-            PF = _np.nan_to_num(PF)
-            return self.apply_NA_restriction(PF)
-
-        if _np.ndim(z) == 0 or _np.ndim(z) == 2:
-            return compute_pupil_function(z)
-
-        elif _np.ndim(z) == 1:
-            return _np.array([compute_pupil_function(_) for _ in z])
-
-
-    def get_sli_pupil_function(self, z0, n_photons, dmf=0, tilt=(0,0)):
-
-        '''
-        Computes the pupil function of a point source in front of a mirror.
-
-        Parameters
-        ----------
-        z0: float or list/tuple of floats or array or list/tuple of arrays
-            Distance between molecule and mirror.
-        d: float
-            Distance between sample-side coverslip surface and focal plane.
-        tilt: tuple of floats
-            Coefficients of the Zernike modes (1,-1) and (1,1) to be added to
-            the pupil function of the mirror image. This simulates the effect of
-            a tilted mirror.
-
-        Returns
-        -------
-        PF: 2D array or list of 2D arrays
-            The 2D complex pupil function or a list of 2D complex pupil
-            functions if z0 was an iterable.
-        '''
-
-        dmf = float(dmf)
-        tv, th = tilt
-        '''
-        if tv != 0:
-            vertical_tilt = float(tv)*_zernike.zernike((1,-1), self.r,
-                    self.theta)
-        if th != 0:
-            horizontal_tilt = float(th)*_zernike.zernike((1,1), self.r,
-                    self.theta)
-        '''
-
-        def compute_sli_pupil_function(z1, z2):
-            pf1 = self.get_pupil_function(z1, 0.5*n_photons)
-            pf2 = self.get_pupil_function(z2, 0.5*n_photons)
-            if tv != 0:
-                pf2 = pf2*_np.exp(1j*vertical_tilt)
-            if th != 0:
-                pf2 = pf2*_np.exp(1j*horizontal_tilt)
-            return pf1 - pf2
-
-        if type(z0) in (list,tuple):
-            z0 = _np.array(z0)
-
-        z1 = z0 - dmf
-        z2 = -(z0 + dmf)
-
-        if _np.ndim(z0) in (0,2):
-            return compute_sli_pupil_function(z1,z2)
-
-        elif _np.ndim(z0) == 1:
-            return _np.array(
-                    [compute_sli_pupil_function(*_) for _ in zip(z1,z2)])
-
-
-
-    def get_sli_virtual_focalplane_modulation(self, z, dmf=0, tilt=(0,0), correction=None):
-
-	# Dummy n_photons of 1000:
-        return -_np.angle(self.get_sli_pupil_function(z, 1000, dmf, tilt))
-
-
 
     def apply_NA_restriction(self, PF):
         '''
@@ -213,88 +122,6 @@ class Pupil(object):
                 mask)
         return [_np.sqrt(1.0/FI[_][_]) for _ in range(3)]
 
-
-
-class Geometry:
-
-    '''
-    A base class for pupil.Experiment which provides basic
-    geometrical data of a microscope experiment.
-
-    Parameters
-    ----------
-    size: tuple
-        The pixel size of a device in the pupil plane of the
-        microscope.
-    cx: float
-        The x coordinate of the pupil function center on the
-        pupil plane device in pixels.
-    cy: float
-        The y coordinate (see cx).
-    d: float
-        The diameter of the pupil function on the pupil device
-        in pixels.
-    '''
-
-
-    def __init__(self, size, cx, cy, d):
-
-        self.cx = float(cx)
-        self.cy = float(cy)
-        self.d = float(d)
-        self.size = size
-        self.nx, self.ny = size
-        self.x_pxl, self.y_pxl = _np.meshgrid(_np.arange(self.nx),_np.arange(self.ny))
-        self.x_pxl -= int(self.cx)
-        self.y_pxl -= int(self.cy)
-        self.r_pxl = _msqrt(self.x_pxl**2+self.y_pxl**2)
-        self.r = 2.0*self.r_pxl/d
-        self.theta = _np.arctan2(self.y_pxl, self.x_pxl)
-        self.x = 2.0*self.x_pxl/d
-        self.y = 2.0*self.y_pxl/d
-
-
-
-class Experiment(Pupil):
-
-    '''
-    Provides computations for a microscope experiment base on
-    Fourier optics.
-
-    Parameters
-    ----------
-
-    geometry: pupil.Geometry
-        A base object that provides basic geometric data of the
-        microscope experiment.
-    l: float
-        The light wavelength in micrometer.
-    n: float
-        The refractive index of immersion and sample media.
-    NA: float
-        The numerical aperture of the microscope objective.
-    f: float
-        The objective focal length in micrometer.
-    '''
-
-    def __init__(self, geometry, l, n, NA, f):
-
-        l = float(l)
-        n = float(n)
-        NA = float(NA)
-        f = float(f)
-        self.geometry = geometry
-        self.nx = geometry.nx
-        self.ny = geometry.ny
-        self.theta = geometry.theta
-        Pupil.__init__(self, l, n, NA, f)
-
-        self.s = self.unit_disk_to_spatial_radial_coordinate(geometry.r)
-        self.alpha = self.spatial_radial_coordinate_to_optical_angle(self.s)
-        self.m = self.spatial_radial_coordinate_to_xy_slope(self.alpha)
-        self.r = geometry.r
-        self.size = geometry.size
-        self.pupil_npxl = sum(self.r<=1)
 
 
 class Simulation(Pupil):
@@ -551,46 +378,3 @@ class Simulation(Pupil):
                 #A[k>k_max] = 0
 
         return A
-
-
-    def sliFocusScan(self,z0,dmfs):
-
-        PSF = []
-        SLM = -_np.angle(self.get_sli_pupil_function(z0,0.0))
-        for dmf in dmfs:
-            PF = self.get_sli_pupil_function(z0,dmf)
-            R = bs(PF)
-            Phi = _np.angle(PF)-SLM
-            PF = R*_np.exp(1j*Phi)
-            PSF.append(_np.abs(self.pf2psf(PF,[0.0]))**2)
-        return PSF
-
-
-    def modulation2slipsf(self, modulation, zs, n_photons, dmf=0,
-            intensity=True, verbose=True):
-
-        nz = len(zs)
-        sliPSF = _np.zeros((nz,self.nx,self.nx))
-
-        for i in range(nz):
-            if verbose: print('Calculating PSF slice for z={0}um.'.format(zs[i]))
-
-            modPF = self.get_sli_pupil_function(zs[i], n_photons, dmf) * \
-                    _np.exp(1j*modulation)
-            sliPSF[i] = self.pf2psf(modPF, 0, intensity=intensity,
-                    verbose=False)
-
-        return sliPSF
-
-
-    def modulations2sliImages(self, modulations, z0, n_photons):
-
-        nz = modulations.shape[0]
-        images = _np.zeros((nz, self.nx, self.nx))
-        PF = self.get_sli_pupil_function(z0, n_photons)
-
-        for i in range(nz):
-            modPF = PF * _np.exp(1j*modulations[i])
-            images[i] = self.pf2psf(modPF, 0, intensity=True, verbose=False)
-
-        return images

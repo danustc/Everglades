@@ -10,8 +10,6 @@ from scipy.ndimage import gaussian_filter as gf
 from scipy import optimize
 import os
 import time
-import matplotlib.pyplot as plt
-import libtim
 import libtim.zern
 from . import signalForAO
 import skimage
@@ -48,15 +46,10 @@ class Control(inLib.Module):
 
         self.sharpnessList = []
 
-        self.currentZernAmpIndex=0
-        self.zernAmpMin = -0.6
-        self.zernAmpMax = 0.6
-        self.zernAmps = np.linspace(self.zernAmpMin,self.zernAmpMax,100)
         self.zernModesToFit = 20 #Number of zernike modes to fit unwrapped pupil functions
 
         self._zernFitUnwrapped = None
         self._zernFitUnwrappedModes = None
-
         self.varyAOactive = True
 
 
@@ -69,74 +62,6 @@ class Control(inLib.Module):
         _ui uses this for sharpness calculations...
         '''
         return self._control.camera.getDimensions()
-
-
-    def _getGeo(self):
-        '''
-        Gets geometry from either SLM (if exist) or elsewhere
-        '''
-        if self.hasSLM:
-            geometry = self._control.slm.getGeometry()
-        elif self.hasMirror:
-            geometry = self._control.mirror.getGeometry()
-        else:
-            geometry = None
-        return geometry
-
-    def _addMOD(self, MOD):
-        if self.hasSLM:
-            index = self._control.slm.addOther(MOD)
-            return index
-        if self.hasMirror:
-            index = self._control.mirror.addOther(MOD)
-            return index
-        else:
-            return None
-
-    def _setZernModeFirstActive(self, coeff):
-        if self.hasSLM:
-            self._control.slm.setZernikeModeFirstActive(coeff)
-
-    def _setOtherActive(self,other_index,state):
-        if self.hasSLM:
-            self._control.slm.setOtherActive(other_index, state)
-        if self.hasMirror:
-            self._control.mirror.setOtherActive(other_index, state)
-
-    def acquireImagesVaryAO(self, nPatterns, nFrames,
-                            filename=None):
-        '''
-        Acquires a stack of images while varying the mirror in some way...
-        '''
-
-        if self.hasMirror:
-            ao = self._control.mirror
-        elif self.hasSLM:
-            ao = self._control.slm
-        else:
-            return None
-        if not self.varyAOactive:
-            return None
-
-        dim = self._control.camera.getDimensions()
-        data = np.zeros((nSteps,) + dim)
-        slicesFrames = np.zeros((nFrames,)+dim)
-
-        for i in range(nPatterns):
-            ao.advancePatternWithPipe()
-            for j in range(nFrames):
-                im = self._control.camera.getMostRecentImageNumpy()
-                if im is None:
-                    time.sleep(frame_length)
-                    im = self._control.camera.getMostRecentImageNumpy()
-                slicesFrames[j] = im
-                time.sleep(frame_length)
-            data[i] = np.mean(slicesFrames, axis=0)
-        if filename:
-            print("ao: Saving vary ao to ", filename)
-            np.save(filename, data)
-        return data
-
 
 
     def acquirePSF(self, range_, nSlices, nFrames, center_xy=True, filename=None,
@@ -293,9 +218,6 @@ class Control(inLib.Module):
             # Where we think the emitter is axially located:
 #             z_offset = -1.0*popt[1] #Added on April 3, 2015
             z_offset = popt[1] # edited on Aug01, 2016
-            plt.plot(z, i)
-            plt.plot(z, gaussian(z,*popt))
-            plt.savefig('z_fit.png')
 
         nx,ny = self._PSF.shape[1:3]
         self._pupil = pupil.Simulation(nx,dx,l,n,NA,f,wavelengths=wavelengths)
@@ -367,11 +289,7 @@ class Control(inLib.Module):
 
 #        fitResults_wrong = libtim.zern.fit_zernike(self._PF.phase, rad=radius, nmodes=25)
         fitResults = libtim.zern.fit_zernike(unwrapped, rad=radius, nmodes=25)
-        # unwrapped: 256x 256
-
         self._PF.zernike_coefficients = fitResults[0]
-        #print("unwrapped:", fitResults[0])
-        #print("original:", fitResults_wrong[0])
 
         return self._PF
 
@@ -525,39 +443,6 @@ class Control(inLib.Module):
 
         # Add an 'Other' modulation using the SLM API. Store the index in _modulations:
         #index = self._control.slm.addOther(MOD)
-        index = self._addMOD(MOD)
-        self._modulations.append(index)
-        return index
-
-    def modulatePF_unwrapped(self):
-        #geometry = self._control.slm.getGeometry()
-        geometry = self._getGeo()
-        MOD = -1*self.unwrap()
-        MOD = np.flipud(MOD)
-        MOD = np.rot90(MOD)
-        cx,cy,d = geometry.cx, geometry.cy, geometry.d
-        # Diameter of phase retrieval output [pxl]:
-        dPhRt = (self._pupil.k_max/self._pupil.kx.max())*self._pupil.nx
-        # Zoom needed to fit onto SLM map:
-        zoom = d/dPhRt
-        MOD = interpolation.zoom(MOD,zoom,order=0,mode='nearest')
-        # Flip up down:
-        #MOD = np.flipud(MOD)
-        # Flip left right:
-        #MOD = np.fliplr(MOD)
-        #MOD = np.rot90(MOD)
-        MOD = np.rot90(-1.0*MOD) #Invert and rot90
-        # Shift center:
-        MOD = interpolation.shift(MOD,(cy-255.5,cx-255.5),order=0,
-                                                       mode='nearest')
-        # Cut out center 512x512:
-        c = MOD.shape[0]/2
-        MOD = MOD[c-256:c+256,c-256:c+256]
-
-
-        # Add an 'Other' modulation using the SLM API. Store the index in _modulations:
-        #index = self._control.slm.addOther(MOD)
-        index = self._addMOD(MOD)
         self._modulations.append(index)
         return index
 
@@ -575,60 +460,7 @@ class Control(inLib.Module):
         np.save(os.path.join(working_dir, filename + '_phase.npy'), self._PF.phase)
 
 
-    def setModulationActive(self, index, state):
-        '''
-        Enables or disables a modulation.
-
-        :Parameters:
-            *index*: int
-                The modulation index given by :func:`modulatePF`.
-            *state*: bool
-                If True, the modulation at *index* is enabled.
-        '''
-        # Retrieve the index of the respective 'Other' Modulation, generated previously by the
-        # SLM API:
-        other_index = self._modulations[index]
-        #self._control.slm.setOtherActive(other_index, state)
-        self._setOtherActive(other_index,state)
-
-    def resetZernAmpIndex(self):
-        self.currentZernAmpIndex = 0
-
-    def setZernAmps(self, zmin, zmax, num=100):
-        '''
-        Creats 1D array of Zernike amplitudes to apply.
-        RunningSharpness thread will advance through these
-        '''
-        self.zernAmps = np.linspace(zmax,zmin,num)
-
-    def getZernMinMax(self):
-        return self.zernAmpMin, self.zernAmpMax
-
-    def getNumberOfZernToVary(self):
-        if self.hasMirror:
-            num = self._control.mirror.getNumberOfZernToVary()
-        elif self.hasSLM:
-            num = 100
-        else:
-            num = 0
-        return num
-
-    def advanceModulation(self):
-        '''
-        In RunningSharpness thread this advances the next pattern
-        to be dispalyed on adaptive optics device
-        '''
-        if self.currentZernAmpIndex >= len(self.zernAmps):
-            self.currentZernAmpIndex = 0
-        coeff = self.zernAmps[self.currentZernAmpIndex]
-        if self.hasSLM:
-            self._control.slm.setZernikeModeFirstActive(coeff)
-            self._setZernModeFirstActive(coeff)
-        elif self.hasMirror:
-            self._control.mirror.advancePatternWithPipe()
-        self.currentZernAmpIndex += 1
-        return coeff
-
+    
     def findSharpnessEachFrame(self, pixelSize, diffLimit, mask=None):
         frame_length = 1.0/self._control.camera.getFrameRate()
         #np_image = self._control._control.camera.getImageForPreview()
@@ -647,10 +479,6 @@ class Control(inLib.Module):
         time.sleep(frame_length)
         return sharpness, self.sharpnessList
 
-    """
-    Below are functions defined by dan.
-
-    """
     def Strehl_ratio(self):
         # this is very raw. Should save the indices for pixels inside the pupil.
         in_pupil = self._pupil.k < self._pupil.k_max
@@ -660,21 +488,6 @@ class Control(inLib.Module):
 
         strehl = c_up/c_down
         return strehl
-
-
-
-#PXL = 0.097
-#WL_fluor = 0.550
-#NA_new = 1.0
-#N_Refrac = 1.33
-#Focal = 9000
-#GS = 'plane'
-#
-
-
-
-
-
 
 
 

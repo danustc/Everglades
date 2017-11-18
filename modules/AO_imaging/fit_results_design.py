@@ -8,6 +8,7 @@
 # WARNING! All changes made in this file will be lost!
 
 from PyQt5 import QtCore, QtWidgets
+from myWidgets.matplotlibwidget import MatplotlibWidget
 
 try:
     _fromUtf8 = QtCore.QString.fromUtf8
@@ -53,4 +54,3 @@ class Ui_Dialog(object):
         Dialog.setWindowTitle(QtWidgets.QApplication.translate("Dialog", "Zernike fit results", None, QtWidgets.QApplication.UnicodeUTF8))
         self.checkBoxRemovePTTD.setText(QtWidgets.QApplication.translate("Dialog", "Remove Piston, Tip, Tilt, Defocus", None, QtWidgets.QApplication.UnicodeUTF8))
 
-#from matplotlibwidget import MatplotlibWidget
