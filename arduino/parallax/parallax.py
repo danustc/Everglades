@@ -4,8 +4,9 @@
 import inLib
 import serial 
 import struct
+import time
 
-channel_pins = {'488':3, '561':4}
+channel_pins = {'488':1, '561':2}
 OD_angles = {'0': 0, '1': 45, '2': 90, '3': 135}
 
 class Control(inLib.Device):
@@ -22,11 +23,9 @@ class Control(inLib.Device):
         print(ch_pin)
         OD_ang = OD_angles[str(n_OD)]
         #self._api.output([ch_pin]) # set the output 
-        to_write = struct.pack('>B', OD_ang)
+        to_write = struct.pack('>2B', ch_pin, OD_ang)
         print(to_write)
-        
         self._api.write(to_write)
-
 
 
 
