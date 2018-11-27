@@ -12,7 +12,7 @@ class Control(inLib.Device):
 
         ports = settings['ports']
 
-        inLib.Device.__init__(self, 'coherent.RS232', settings, ports)
+        inLib.Device.__init__(self, 'coherent.RS232_API', settings, ports)
 
         self.num_ports = len(ports)
 
@@ -27,6 +27,7 @@ class Control(inLib.Device):
             self.laser_lines.append(laser_wavelength)
             pow_range = self.getPowerRange(i)
             self.power_range.append(pow_range)
+            
 
     def setCDRHDelay(self, port, state):
         if state==0:
@@ -60,7 +61,7 @@ class Control(inLib.Device):
             return 1
         else:
             return 0
-
+        
     def getPowerRange(self, port):
         self._api.sendCommand(port, "SOUR:POW:LIM:HIGH?")
         resp = self._api.waitResponse(port).rsplit('\r\n')
