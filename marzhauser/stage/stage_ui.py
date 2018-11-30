@@ -132,6 +132,7 @@ class UI(inLib.DeviceUI):
         self._ui.labelY.setText('%.3f' % y)
 
 
+
     def shutDown(self):
         self._positionUpdater.stop()
 
