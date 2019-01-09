@@ -17,9 +17,8 @@ transform_mat = np.array([
     ]) # the transform matrix between the lab frame and the image frame
 
 def _phase_construct_(NK, x0, shift = True):
-    kk = np.arange(NK)
-    if shift:
-        kk = np.fft.fftshift(kk)
+    HK = int(NK//2)
+    kk = np.arange(NK)-HK
     phi = 2.0*np.pi*kk*x0/NK
     phase = np.cos(phi) - np.sin(phi)*1j
     return phase
@@ -60,7 +59,8 @@ def transform(stack, scan_range = 6.0, pxl = 0.103, method = 'direct'):
             padded_stack[nn, y_shift:(y_shift + NY), :] = stack[nn]
     elif method == 'fourier':
         for nn in range(NZ):
-            y_shift = int(z_range[NZ-nn-1]/pxl)
+            y_shift = z_range[NZ-nn-1]/pxl
+            #y_shift = int(z_range[NZ-nn-1]/pxl)
             padded_slice = np.pad(stack[nn], ((n_pad, n_pad),(0,0)), 'constant')
             padded_stack[nn] = shift_fourier(padded_slice, y_shift)
     # next, shift the y back
@@ -73,11 +73,14 @@ def main():
     load and test the data
     '''
     SC_list = glob.glob(global_datapath + '*SC*.npy')
+    RC_list = glob.glob(global_datapath + '*RC*.npy')
     SC_psf = np.load(SC_list[0])
     padded_stack = transform(SC_psf, method = 'fourier').astype('uint16')
+    tf.imsave('SC_padded_ft.tif', padded_stack)
 
-    tf.imsave('padded_ft.tif', padded_stack)
-    tf.imsave('original.tif', SC_psf.astype('uint16'))
+    RC_psf = np.load(RC_list[0])
+    padded_stack = transform(RC_psf, method = 'fourier').astype('uint16')
+    tf.imsave('RC_padded_ft.tif', padded_stack)
 
 if __name__ == '__main__':
     main()
