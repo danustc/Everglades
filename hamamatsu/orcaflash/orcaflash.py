@@ -6,8 +6,6 @@ from PyQt5.QtGui import QImage
 import numpy as np
 from libs.imagewriters import DaxFile 
 import time
-import ctypes
-import queue
 import threading
 #from modules.adaptiveOptics import signalForAO
 

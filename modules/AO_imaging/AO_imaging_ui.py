@@ -1,15 +1,28 @@
 #!/usr/bin/python
 
 
-from PyQt5 import QtWidgets,QtCore
+from PyQt5 import QtWidgets,QtCore, QtGui
 import inLib
-from Utilities import QExtensions as qext
 import numpy as np
-from numpy.lib.scimath import sqrt as _msqrt
 from . import fit_results_design
-import copy
 import time
-from libs import scipy_gaussfitter
+from myWidget import QExtensions as qext
+
+def clickable(widget):
+    class Filter(QtCore.QObject):
+        clicked = QtCore.pyqtSignal(int,int)
+        def eventFilter(self,obj,event):
+            if obj == widget:
+                if event.type() == QtCore.QEvent.MouseButtonRelease:
+                    #buttonState = event.button()
+                    self.clicked.emit(event.x(),event.y())
+                    return True
+            return False
+    filter=Filter(widget)
+    widget.installEventFilter(filter)
+    return filter.clicked
+
+
 
 class UI(inLib.ModuleUI):
 
@@ -27,46 +40,49 @@ class UI(inLib.ModuleUI):
         self._ui.doubleSpinBoxRange.setValue(self._control._settings['range'])
         self._ui.spinBoxSlices.setValue(self._control._settings['nSlices'])
         self._ui.spinBoxFrames.setValue(self._control._settings['nFrames'])
-        self._ui.lineEdit_fname.setText(self._control._settings['filename'])
+        self._ui.lineEdit_imagedest.setText(self._control._settings['filename'])
 
         self._ui.spinBoxIterations.setValue(self._control._settings['nIterations'])
         self._ui.pushButton_Acquire.clicked.connect(self.acquirePSF)
         self._ui.pushButton_modulate.clicked.connect(self.modulate)
         self._ui.pushButton_save.clicked.connect(self.savePF)
 
-        self._ui.pushButton_modUnwrapped.clicked.connect(self.modulateUnwrapped)
+        self._ui.labelDisplay.paintEvent = self._labelDisplay_paintEvent
+        clickable(self._ui.labelDisplay).connect(self._mousePressEvent)
 
-        self._ui.groupBoxModulations.toggled.connect(self._modulations_toggled)
-
-        self._ui.pushButton_unwrap.clicked.connect(self.unwrap)
-
-        self._ui.pushButton_zernFitUnwrapped.clicked.connect(self.fitUnwrapped)
 
         self._ui.spinBox_zernModesToFit.setValue(self._control.zernModesToFit)
         self._ui.spinBox_zernModesToFit.valueChanged.connect(self.setZernModesToFit)
-
-        self._ui.pushButton_sync.clicked.connect(self.set_modulations)
 
         self.zernRadius = 0
 
         self._modulations = []
         self.use_zernike = False
         self.remove_PTTD = True
-
-
+        self._pixmap = None
         self._scanner = None
 
-        self._sharpnessPlot = None
 
+
+        self._autoscale = True
         self.imsize = (256,256)
-        self.pixelSize = 163
+        self.pixelSize = 103
         self.diffLimit = 800
+        self._cmap = None
+        self._xres, self._yres = self.imsize
 
 
         self._ui.tabWidget_viewer.setEnabled(True)
 
         self.hasSLM = self._control.hasSLM
         self.hasMirror = self._control.hasMirror
+        
+        self._control.preview()
+        
+        self._updater = QtCore.QTimer()
+        self._updater.timeout.connect(self._update)
+        self._updater.start(50)
+        
 
     def _displayPhase(self, phase):
         self._ui.mplwidget_PF.figure.axes[0].get_xaxis().set_visible(False)
@@ -74,9 +90,6 @@ class UI(inLib.ModuleUI):
         self._ui.mplwidget_PF.figure.axes[0].matshow(phase, cmap='RdBu')
         self._ui.mplwidget_PF.draw()
 
-    def _plotSharpness(self, sharpness):
-        self._ui.mplwidget_sharpness.figure.axes[0].plot(sharpness)
-        self._ui.mplwidget_sharpness.draw()
 
     def _updateImSize(self):
         self.imsize = self._control.updateImSize()
@@ -113,6 +126,7 @@ class UI(inLib.ModuleUI):
 
 
     def acquirePSF(self):
+        self._updater.stop()
         range_ = self._ui.doubleSpinBoxRange.value()
         nSlices = self._ui.spinBoxSlices.value()
         nFrames = self._ui.spinBoxFrames.value()
@@ -120,21 +134,21 @@ class UI(inLib.ModuleUI):
         maskRadius = self._ui.spinBox_maskRadius.value()
         cX = int(self._ui.lineEdit_cX.text())
         cY = int(self._ui.lineEdit_cY.text())
-        fname = None
-        fname = str(self._ui.lineEdit_fname.text())
+        imagedest = str(self._ui.lineEdit_imagedest.text())
         self._scanner = Scanner(self._control, range_, nSlices, nFrames, center_xy,
-                                fname, maskRadius, (cX,cY))
+                                imagedest, maskRadius, (cX,cY))
         self._scanner.finished.connect(self._on_scan_done)
         self._ui.pushButton_Acquire.setEnabled(False)
         self._scanner.start()
+        self._updater.start()
 
 
     def _on_scan_done(self):
         self._ui.pushButton_Acquire.setEnabled(True)
         self._ui.groupBoxPhase.setEnabled(True)
-        time.sleep(2)
-        sharpness = self._control.getSharpness()
-        self._plotSharpness(sharpness)
+        time.sleep(1)
+        
+      
 
     def foundMaxArgSharp(self, argmax):
         '''
@@ -239,24 +253,41 @@ class UI(inLib.ModuleUI):
         nmodes = self._ui.spinBox_zernModesToFit.value()
         self._control.setZernModesToFit(nmodes)
 
-    def fitUnwrapped(self):
-        ignore4 = self._ui.checkBox_ignore4.isChecked()
-        resultFit = self._control.zernFitUnwrapped(skip4orders=ignore4)
-        self._ui.mplwidget_PF_2.figure.axes[0].matshow(resultFit, cmap='RdBu')
-        self._ui.mplwidget_PF_2.draw()
 
-    def modulateUnwrappedZernike(self):
-        modulation = Modulation(len(self._modulations), self)
-        self._ui.verticalLayoutModulations.insertWidget(0, modulation.checkbox)
-        self._modulations.append(modulation)
-        mask = self._ui.checkBox_useMask.isChecked()
-        self._control.modZernFitUnwrapped(useMask=mask, radius=self.zernRadius)
-        if self.hasSLM:
-            self._ui_control.slm.updateModulationDisplay()
 
-    def oneRun(self):
-        # added by Dan to perform one-Run experiment
-        self._control.one_Run(4)
+    # ----------------------------------Below is a set of events, copied from orcaflase ----------------
+    def _update(self):
+        np_image = self._control.getImageForPreview()
+        if np_image is not None:
+            #self._plotCrossSection(np_image)
+            np_min = np_image[2:-2,2:-2].min()
+            np_max = np_image[2:-2,2:-2].max()
+            if self._autoscale:
+                self.vmin = np_min
+                self.vmax = np_max
+            
+            if self.vmin==self.vmax or self.vmin>self.vmax:
+                self.vmax = 1+self.vmin
+            qt_image = qext.numpy_to_qimage8(np_image, self.vmin, self.vmax, self._cmap)
+            self._pixmap = QtGui.QPixmap.fromImage(qt_image)
+            #xdim = np.minimum(512, self._control._props["dimensions"][0])
+            #ydim = np.minimum(512, self._control._props["dimensions"][1])
+            #self._pixmap = self._pixmap.scaled(xdim, ydim, QtCore.Qt.KeepAspectRatio)
+            self._pixmap = self._pixmap.scaled(512, 512, QtCore.Qt.KeepAspectRatio)
+            #if self._ui.checkBox_showTarget.isChecked():
+            #    self._drawTarget()
+            self._ui.labelDisplay.update()
+            
+    def _labelDisplay_paintEvent(self, event):
+        qp = QtGui.QPainter(self._ui.labelDisplay)
+        if self._pixmap != None:
+            qp.drawPixmap(0,0,self._pixmap)
+        qp.setPen(QtCore.Qt.red)
+        
+
+    def _mousePressEvent(self,x,y):
+        self.x = int(x*(self._yres/512.))
+        self.y = int(y*(self._xres/512.))
 
 
 
@@ -300,19 +331,20 @@ class FitResultsDialog(QtWidgets.QDialog):
 
 class Scanner(QtCore.QThread):
 
-    def __init__(self, control, range_, nSlices, nFrames, center_xy, fname, maskRadius, maskCenter):
+    def __init__(self, control, range_, nSlices, nFrames, center_xy, imagedest, maskRadius, maskCenter):
         QtCore.QThread.__init__(self)
+
 
         self.control = control
         self.range_ = range_
         self.nSlices = nSlices
         self.nFrames = nFrames
         self.center_xy = center_xy
-        self.fname = fname
+        self.imagedest = imagedest
         self.maskRadius = maskRadius
         self.maskCenter = maskCenter
 
     def run(self):
         self.control.acquirePSF(self.range_, self.nSlices, self.nFrames,
-                                self.center_xy, self.fname,
+                                self.center_xy, self.imagedest,
                                 self.maskRadius, self.maskCenter)

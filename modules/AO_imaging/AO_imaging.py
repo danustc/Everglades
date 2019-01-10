@@ -3,8 +3,7 @@
 
 import inLib
 import numpy as np
-from Utilities import zernike
-from . import pupil_forInControl as pupil
+from myWidget import pupil
 from scipy.ndimage import interpolation
 from scipy.ndimage import gaussian_filter as gf
 from scipy import optimize
@@ -12,7 +11,6 @@ import os
 import time
 import libtim.zern
 from . import signalForAO
-import skimage
 from skimage.restoration import unwrap_phase
 
 # Constant parameter
@@ -62,6 +60,13 @@ class Control(inLib.Module):
         _ui uses this for sharpness calculations...
         '''
         return self._control.camera.getDimensions()
+    
+    
+    def preview(self):
+        self._control.camera.beginPreview()
+
+    def getImageForPreview(self):
+        return self._control.camera.getImageForPreview()
 
 
     def acquirePSF(self, range_, nSlices, nFrames, center_xy=True, filename=None,
@@ -101,18 +106,20 @@ class Control(inLib.Module):
         self._dz = abs(range_/(nSlices-1.0))
 
         # Scan the PSF:
+        origin_x, origin_y, origin_z = self._control.stage.position() 
+        print("Positions:", origin_x, origin_y)
         scan = self._control.piezoscan.scan(start, end, nSlices, nFrames, filename)
 
-        nz, nx, ny = scan.shape
+        nz, ny, nx = scan.shape
         # An empty PSF
         PSF = np.zeros_like(scan)
-        g = pupil.Geometry((nx,ny), nx/2.-0.5, ny/2.-0.5, 16)
+        g = pupil.Geometry((ny,nx), ny/2.-0.5, nx/2.-0.5, 16)
         # cyl = np.array(nz*[g.r_pxl<16])
         new_cyl = np.array(nz*[g.r_pxl<mask_size])
         # Hollow cylinder
         hcyl = np.array(nz*[np.logical_and(g.r_pxl>=50, g.r_pxl<61)])
         if mask_center[0] > -1:
-            g2 = pupil.Geometry((nx,ny), mask_center[0], mask_center[1], 16)
+            g2 = pupil.Geometry((ny,nx), mask_center[0], mask_center[1], 16)
             mask = g2.r_pxl<mask_size
         else:
             mask = g.r_pxl<mask_size
@@ -303,63 +310,7 @@ class Control(inLib.Module):
     def setZernModesToFit(self, nmodes):
         self.zernModesToFit = nmodes
 
-    def zernFitUnwrapped(self, skip4orders=False):
-        unwrapped = self.unwrap()
-
-        #geometry = self._control.slm.getGeometry()
-        geometry = self._getGeo()
-
-        nx,ny = unwrapped.shape
-        rad = np.sum(self._pupil.r[nx/2,:]<1)/2
-        print("radius:", rad)
-
-
-        if skip4orders:
-            zernModes, resultFit, errFit = libtim.zern.fit_zernike(unwrapped, nmodes=self.zernModesToFit, rad=rad,
-                                                                   startmode=5)
-        else:
-            zernModes, resultFit, errFit = libtim.zern.fit_zernike(unwrapped, nmodes=self.zernModesToFit, rad=rad)
-
-        MOD0 = resultFit
-        newMOD = np.zeros((geometry.nx,geometry.ny))
-        nx,ny = MOD0.shape
-        newMOD[geometry.cx-np.floor(nx/2.):geometry.cx+np.ceil(nx/2.),geometry.cy-np.floor(ny/2.0):geometry.cy+np.ceil(ny/2.)] = MOD0.copy()
-        self._zernFitUnwrapped = newMOD
-        self._zernFitUnwrappedModes = zernModes
-
-        return resultFit
-
-    def modZernFitUnwrapped(self, useMask=False, radius=0):
-        #geometry = self._control.slm.getGeometry()
-        geometry = self._getGeo()
-        d = geometry.d
-        if radius==0:
-            r = d/2
-        else:
-            r = radius
-        cx = geometry.cx
-        cy = geometry.cy
-        if self._zernFitUnwrappedModes is not None:
-            print("ZernFitUnwrapped Modes: ", self._zernFitUnwrappedModes)
-            print("Radius for zernCalc: ", r)
-            zernCalc = libtim.zern.calc_zernike(self._zernFitUnwrappedModes, r, mask=useMask)
-
-            MOD = -1*zernCalc
-            MOD = np.flipud(MOD)
-            MOD = np.rot90(MOD)
-            MOD = np.rot90(-1.0*MOD)
-            #MOD = interpolation.shift(MOD,(cy-255.5,cx-255.5),order=0,
-            #                                       mode='nearest')
-            newMOD = np.zeros((geometry.nx,geometry.ny))
-            nx,ny = MOD.shape
-            newMOD[cy-np.floor(nx/2.):cy+np.ceil(nx/2.),cx-np.floor(ny/2.):cx+np.ceil(ny/2.)] = MOD.copy()
-            if self.hasSLM:
-                index = self._control.slm.addOther(newMOD)
-            else:
-                index = self._control.mirror.addOther(newMOD)
-            self._modulations.append(index)
-            return index
-
+    
 
     def removePTTD(self):
         p = self._PF.zernike_coefficients
@@ -367,84 +318,6 @@ class Control(inLib.Module):
         self._PF.zernike_coefficients = p
         #self._PF.zernike_coefficients[0:4] = 0
         return self._PF
-
-
-    def modulatePF(self, use_zernike=True):
-        '''
-        Sends phase of the current internally stored pupil function to the SLM.
-
-        :Returns:
-            *index*: int
-                Each modulation that is sent to the SLM by the AdaptiveOptics module has an
-                individual index, which can be used later to access this modulation.
-        '''
-        print('Modulating pupil function.')
-
-        #geometry = self._control.slm.getGeometry()
-        geometry = self._getGeo()
-
-        if use_zernike:
-            # The SLM vs camera image is flipped upside down. That's why we define a
-            # flipped theta:
-            #x_pxl = -geometry.x_pxl
-            #theta = np.arctan2(geometry.y_pxl, x_pxl)
-            #MOD = -zernike.basic_set(self._PF.zernike_coefficients, geometry.r, theta)
-            if self._zernFitUnwrappedModes is not None:
-                print("ZernFitUnwrapped Modes: ", self._zernFitUnwrappedModes)
-                    #print "Radius for zernCalc: ", r
-                zernCalc = libtim.zern.calc_zernike(self._zernFitUnwrappedModes,geometry.d/2.0,
-                                               zern_data ={}, mask = False)
-                MOD0=-1*zernCalc
-
-            else:
-                print("not pre-fitted!")
-                MOD0 = -1*libtim.zern.calc_zernike(self._PF.zernike_coefficients, geometry.d/2.0,
-                                               zern_data ={}, mask = False)
-            print("Using zernike to modulate. Radius of calculated mod: ", (geometry.d/2.0))
-            MOD0 = np.flipud(MOD0)
-            MOD0 = np.rot90(MOD0)
-            MOD0 = np.rot90(-1.0*MOD0)
-            MODx,MODy = MOD0.shape
-            newMOD = np.zeros((geometry.nx,geometry.ny))
-            newMOD[geometry.cx-np.floor(MODx/2.):geometry.cx+np.ceil(MODx/2.),geometry.cy-np.floor(MODy/2.0):geometry.cy+np.ceil(MODy/2.)] = MOD0.copy()
-            MOD = newMOD
-            # Added by Dan on 08/26, save automatically the zernike-fitted pupil. re
-            # Added by Dan on 09/02, save the zernike-fitted pupil without mask, but when apply,
-            # apply the masked one so that the patterns can be visualized clearer.
-            Rmod = geometry.d/2.0
-
-
-            np.save(self.filename+'_zfit', MOD)
-
-
-        else:
-            MOD = -1*self._PF.phase
-            MOD = np.flipud(MOD)
-            MOD = np.rot90(MOD)
-            cx,cy,d = geometry.cx, geometry.cy, geometry.d
-            # Diameter of phase retrieval output [pxl]:
-            dPhRt = (self._pupil.k_max/self._pupil.kx.max())*self._pupil.nx
-            # Zoom needed to fit onto SLM map:
-            zoom = d/dPhRt
-            MOD = interpolation.zoom(MOD,zoom,order=0,mode='nearest')
-            # Flip up down:
-            #MOD = np.flipud(MOD)
-            # Flip left right:
-            #MOD = np.fliplr(MOD)
-            #MOD = np.rot90(MOD)
-            MOD = np.rot90(-1.0*MOD) #Invert and rot90
-            # Shift center:
-            MOD = interpolation.shift(MOD,(cy-255.5,cx-255.5),order=0,
-                                                   mode='nearest')
-            # Cut out center 512x512:
-            c = MOD.shape[0]/2
-            MOD = MOD[c-256:c+256,c-256:c+256]
-
-
-        # Add an 'Other' modulation using the SLM API. Store the index in _modulations:
-        #index = self._control.slm.addOther(MOD)
-        self._modulations.append(index)
-        return index
 
 
     def savePF(self, filename):
@@ -479,15 +352,7 @@ class Control(inLib.Module):
         time.sleep(frame_length)
         return sharpness, self.sharpnessList
 
-    def Strehl_ratio(self):
-        # this is very raw. Should save the indices for pixels inside the pupil.
-        in_pupil = self._pupil.k < self._pupil.k_max
-        NK = in_pupil.sum()
-        c_up = np.abs(self.pf_complex.sum())**2
-        c_down = (self.pf_ampli**2).sum()*NK
 
-        strehl = c_up/c_down
-        return strehl
 
 
 

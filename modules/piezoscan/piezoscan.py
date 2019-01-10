@@ -52,6 +52,7 @@ class Control(inLib.Module):
                 up=False
             data = self.scan_thorlabs(nSteps, nFrames, up=up, filename=filename)
         elif self.useMarzhauser:
+            print("Use marzhauser.")
             data = self.scan_stage(start, end, nSteps, nFrames, filename=filename, later_direction=later_direction)
         else:
             data = self.scan_piezo(start, end, nSteps, nFrames, filename=filename)
@@ -92,10 +93,10 @@ class Control(inLib.Module):
         '''
         Performs a motor stage scan. Added by Dan on 11/13/2017.
         '''
-        print("stage scan: Scanning with parameters:", start, end, nSteps)
+        print("Step 1, stage scan: Scanning with parameters:", start, end, nSteps)
         self.active = True
         origin_x, origin_y, origin_z = self._control.stage.position() 
-        print("Original position:", origin_x, origin_y, origin_z) 
+        print("Step 2, Original position:", origin_x, origin_y, origin_z) 
         ds = (end-start)/(nSteps-1.0) # the step size, pos or neg
         dx = ds*np.cos(later_direction)
         dy = ds*np.sin(later_direction)
@@ -103,9 +104,11 @@ class Control(inLib.Module):
         rs_y = start*np.sin(later_direction)
         self._control.stage.goRelative(rs_x, rs_y)
         dim = self._control.camera.getDimensions()
+        print("Step 3, Dimension:", dim)
         data = np.zeros((nSteps,) + dim)
         slicesFrames = np.zeros((nFrames,)+dim)
         frame_length = 1.0/self._control.camera.getFrameRate()
+        print("frame length:", frame_length)
         for ii in range(nSteps):
             if self.active:
                 self._control.stage.goRelative(dx, dy)

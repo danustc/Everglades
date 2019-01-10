@@ -9,75 +9,64 @@ import serial
 
 
 class API():
-    def __init__(self, ports, timeout=None,
-                 baudrate=19200, end_of_line="\r", wait_time=0.05):
-        self.tty = []
-        self.live = []
-        num_of_ports = len(ports)
-        print("Ports:", ports)
-        self.end_of_line = end_of_line
-        for i in range(0,num_of_ports):
-            print(ports[i])
-            try:
-                print("import new laser:")
-                ser = serial.Serial(ports[i], baudrate, timeout=timeout) 
-                print("new port:", ser)
-                self.tty.append(ser)
-                #self.tty.append(uspp.SerialPort(ports[i], timeout, baudrate))
-                self.wait_time = wait_time
-                time.sleep(self.wait_time)
-                #self.tty[i].flush()
-                time.sleep(self.wait_time)
-                self.live.append(1)
-            except:
-                print("Error importing laser:", ports[i])
-                self.live.append(0)
+    def __init__(self, port, timeout=None,
+                 baudrate=9600, end_of_line="\r", wait_time=0.05):
+        print("Port:", port)
+        try:
+            self.tty = serial.Serial(port, baudrate, timeout=timeout) 
+            print("new port:", self.tty)
+            #self.tty.append(uspp.SerialPort(ports[i], timeout, baudrate))
+            self.tty.flush()
+            self.end_of_line = end_of_line
+            self.wait_time = wait_time
+            time.sleep(self.wait_time)
+        except FileNotFoundError:
+            print("Could not open the port.")
 
-    def commWithResp(self, port_num, command):
-        print(port_num)
-        self.tty[port_num].flush()
-        self.tty[port_num].write(command + self.end_of_line)
+
+    def commWithResp(self, command):
+        self.tty.flush()
+        self.tty.write((command + self.end_of_line).encode())
         time.sleep(10 * self.wait_time)
         response = ""
-        response_len = self.tty[port_num].inWaiting()
+        response_len = self.tty.inWaiting()
         while response_len:
-            response += self.tty[port_num].read(response_len)
+            response += self.tty.read(response_len).decode()
+            print(response)
             time.sleep(self.wait_time)
-            response_len = self.tty[port_num].inWaiting()
+            response_len = self.tty.inWaiting()
         if len(response) > 0:
             return response
 
-    def sendCommand(self, port_num, command):
-        self.tty[port_num].flush()
-        self.tty[port_num].write((command + self.end_of_line).encode())
+    def sendCommand(self, command):
+        self.tty.flush()
+        self.tty.write((command + self.end_of_line).encode())
 
     def shutDown(self):
         print("RS232 shutDown")
         del(self.tty)
 
-    def getResponse(self, port_num):
+    def getResponse(self):
         response = ""
-        response_len = self.tty[port_num].inWaiting()
+        response_len = self.tty.inWaiting()
         while response_len:
-            response += self.tty[port_num].read(response_len).decode()
+            response += self.tty.read(response_len).decode()
             time.sleep(self.wait_time)
-            response_len = self.tty[port_num].inWaiting()
+            response_len = self.tty.inWaiting()
         if len(response) > 0:
             return response
 
-    def getStatus(self, port_num):
-        return self.live[port_num]
 
-    def waitResponse(self, port_num, end_of_response = 0, max_attempts = 200):
+    def waitResponse(self, end_of_response = 0, max_attempts = 200):
         if not end_of_response:
             end_of_response = str(self.end_of_line)
         attempts = 0
         response = ""
         index = -1
         while (index == -1) and (attempts < max_attempts):
-            response_len = self.tty[port_num].inWaiting()
+            response_len = self.tty.inWaiting()
             if response_len > 0:
-                response += self.tty[port_num].read(response_len).decode()
+                response += self.tty.read(response_len).decode()
             time.sleep(0.1 * self.wait_time)
             index = response.find(end_of_response)
             attempts += 1

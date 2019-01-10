@@ -1,89 +1,79 @@
 #!/usr/bin/python
 #
+# Wraps the uspp library for RS232 communication.
+#
 # Hazen 3/09
-# edited by Dan on 06/04/18, replaced uspp with the more up-to-date serial library.
+#
 
-#import uspp.uspp as uspp
+from . import uspp.uspp as uspp
 import time
-import serial
-
 
 class API():
-    def __init__(self, ports, timeout=None,
-                 baudrate=19200, end_of_line="\r", wait_time=0.05):
-        self.tty = []
-        self.live = []
-        num_of_ports = len(ports)
-        print("Ports:", ports)
+    def __init__(self, port, timeout=None,
+                 baudrate=9600, end_of_line="\r", wait_time=0.05):
+        self.tty = uspp.SerialPort(port, timeout, baudrate)
+        self.tty.flush()
         self.end_of_line = end_of_line
-        for i in range(0,num_of_ports):
-            print(ports[i])
-            try:
-                print("import new laser:")
-                ser = serial.Serial(ports[i], baudrate, timeout=timeout) 
-                print("new port:", ser)
-                self.tty.append(ser)
-                #self.tty.append(uspp.SerialPort(ports[i], timeout, baudrate))
-                self.wait_time = wait_time
-                time.sleep(self.wait_time)
-                #self.tty[i].flush()
-                time.sleep(self.wait_time)
-                self.live.append(1)
-            except:
-                print("Error importing laser:", ports[i])
-                self.live.append(0)
+        self.wait_time = wait_time
+        time.sleep(self.wait_time)
+        self.live = 1
+        print(port)
 
-    def commWithResp(self, port_num, command):
-        print(port_num)
-        self.tty[port_num].flush()
-        self.tty[port_num].write(command + self.end_of_line)
+    def commWithResp(self, command):
+        self.tty.flush()
+        self.tty.write(command + self.end_of_line)
         time.sleep(10 * self.wait_time)
         response = ""
-        response_len = self.tty[port_num].inWaiting()
+        response_len = self.tty.inWaiting()
         while response_len:
-            response += self.tty[port_num].read(response_len)
+            response += self.tty.read(response_len)
             time.sleep(self.wait_time)
-            response_len = self.tty[port_num].inWaiting()
+            response_len = self.tty.inWaiting()
         if len(response) > 0:
             return response
 
-    def sendCommand(self, port_num, command):
-        self.tty[port_num].flush()
-        self.tty[port_num].write((command + self.end_of_line).encode())
+    def sendCommand(self, command):
+        self.tty.flush()
+        self.tty.write(command + self.end_of_line)
 
     def shutDown(self):
         print("RS232 shutDown")
         del(self.tty)
 
-    def getResponse(self, port_num):
+    def getResponse(self):
         response = ""
-        response_len = self.tty[port_num].inWaiting()
+        response_len = self.tty.inWaiting()
         while response_len:
-            response += self.tty[port_num].read(response_len).decode()
+            response += self.tty.read(response_len)
             time.sleep(self.wait_time)
-            response_len = self.tty[port_num].inWaiting()
+            response_len = self.tty.inWaiting()
         if len(response) > 0:
             return response
 
-    def getStatus(self, port_num):
-        return self.live[port_num]
+    def getStatus(self):
+        return self.live
 
-    def waitResponse(self, port_num, end_of_response = 0, max_attempts = 200):
+    def waitResponse(self, end_of_response = 0, max_attempts = 200):
         if not end_of_response:
             end_of_response = str(self.end_of_line)
         attempts = 0
         response = ""
         index = -1
         while (index == -1) and (attempts < max_attempts):
-            response_len = self.tty[port_num].inWaiting()
+            response_len = self.tty.inWaiting()
             if response_len > 0:
-                response += self.tty[port_num].read(response_len).decode()
+                response += self.tty.read(response_len)
             time.sleep(0.1 * self.wait_time)
             index = response.find(end_of_response)
             attempts += 1
         return response
 
-
+if __name__ == '__main__':
+    api = API('COM3')
+    api.sendCommand('00STP')
+    time.sleep(2)
+    api.sendCommand('00RUN')
+    time.sleep(2)
 #
 # The MIT License
 #
