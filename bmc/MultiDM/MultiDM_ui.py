@@ -3,12 +3,8 @@
 
 from PyQt5 import QtWidgets,QtCore
 import inLib
-from Utilities import QExtensions as qext
 import numpy as np
 from numpy.lib.scimath import sqrt as _msqrt
-import copy
-import time
-import skimage
 import threading
 
 class UI(inLib.DeviceUI):
@@ -128,52 +124,6 @@ class UI(inLib.DeviceUI):
         self._applyToMirrorThread.start()
         #self._control.applyToMirror()
 
-    def toMirrorManyZerns(self):
-        '''
-        runs when pushButton_toMirrorManyZerns is pushed
-
-        Creates instance of class ApplyManyZernsToMirror which runs as
-        a separate thread.
-        '''
-        mode = self._ui.spinBox_zernMode.value()
-        mask = self._ui.checkBox_zernMask.isChecked()
-        maxAmp = float(self._ui.lineEdit_maxZAmp.text())
-        minAmp = float(self._ui.lineEdit_minZAmp.text())
-        num = self._ui.spinBox_numZerns.value() #Zernike Mode
-        wTime = int(self._ui.lineEdit_wTime.text())
-        radius = int(self._ui.lineEdit_zernRad.text())
-        '''
-        if zernWithSharpness is checked, then advancing through zernike amplitudes
-        will wait for AO module. Otherwise, will advance automatically
-        '''
-        withRunning = self._ui.checkBox_zernWithSharpness.isChecked()
-        clearFirst = self._ui.checkBox_clearFirst.isChecked()
-        self._applyManyZernsThread = ApplyManyZernsToMirror(self._control, mode, maxAmp,
-                                                            minAmp, num, wTime, radius, mask,
-                                                            clearFirst,
-                                                            withRunning)
-        self._applyManyZernsThread.start()
-
-    def toMirrorManyZernRadii(self):
-        mode = self._ui.spinBox_zernMode.value()
-        amp = float(self._ui.lineEdit_zernAmp.text())
-        mask = self._ui.checkBox_zernMask.isChecked()
-        maxR = float(self._ui.lineEdit_maxZAmp.text())
-        minR = float(self._ui.lineEdit_minZAmp.text())
-        num = self._ui.spinBox_numZerns.value() #Zernike Mode
-        wTime = int(self._ui.lineEdit_wTime.text())
-        radius = int(self._ui.lineEdit_zernRad.text())
-        '''
-        if zernWithSharpness is checked, then advancing through zernike amplitudes
-        will wait for AO module. Otherwise, will advance automatically
-        '''
-        withRunning = self._ui.checkBox_zernWithSharpness.isChecked()
-        clearFirst = self._ui.checkBox_clearFirst.isChecked()
-        self._applyManyZernRadiiThread = ApplyManyZernRadiiToMirror(self._control, mode, amp, maxR,
-                                                                    minR, num, wTime, radius, mask,
-                                                                    clearFirst,
-                                                                    withRunning)
-        self._applyManyZernRadiiThread.start()
 
 
     def toMirrorGroupVary(self):
@@ -188,27 +138,6 @@ class UI(inLib.DeviceUI):
                                                                 clearFirst,
                                                                 withRunning)
         self._applyGroupOffsetsThread.start()
-
-    def toMirrorVaryMult(self):
-        maxMult = float(self._ui.lineEdit_maxZAmp.text())
-        minMult = float(self._ui.lineEdit_minZAmp.text())
-        num = self._ui.spinBox_numZerns.value()
-        wTime = int(self._ui.lineEdit_wTime.text())
-        withRunning = self._ui.checkBox_zernWithSharpness.isChecked()
-        clearFirst = self._ui.checkBox_clearFirst.isChecked()
-
-        self._applyManyMultsToMirrorThread = ApplyManyMultsToMirror(self._control, minMult,
-                                                                    maxMult, num, wTime, withRunning)
-        self._applyManyMultsToMirrorThread.start()
-
-    def varyfile(self):
-        wTime = int(self._ui.lineEdit_wTime.text())
-        withRunning = self._ui.checkBox_zernWithSharpness.isChecked()
-        if self.varyfilename is not None:
-            self._applyVaryFileThread = ApplyManyFromFile(self._control,
-                                                          self.varyfilename, wTime,
-                                                          withRunning)
-            self._applyVaryFileThread.start()
 
     def pokeSegment(self):
         segment = self._ui.spinBox_segment.value()
@@ -310,74 +239,7 @@ class ApplyToMirror(QtCore.QThread):
     def run(self):
         self._control.applyToMirror()
 
-class ApplyManyZernsToMirror(QtCore.QThread):
 
-    def __init__(self, control, mode, maxAmp, minAmp, num,
-                 wTime, radius, mask, clearFirst, withRunning):
-        '''
-        Applies range of amplitudes of a zernike mode to the mirror
-
-        :Parameters:
-            *control*: class
-                Deformable mirror control class
-            *mode*: int
-                Zernike mode to apply
-            *maxAmp*: float
-                Maximum amplitude of Zernike mode
-            *minAmp*: float
-                Minimum amplitude of Zernike mode
-            *num*: int
-                Number of amplitudes to apply to mirror
-            *wTime*: float
-                Wait time in milliseconds
-            *mask*: boolean
-                Whether or not to restrict Zernike calculated pattern
-                to NA-limited circle or to cover entire square mirror
-                       
-
-        '''
-        QtCore.QThread.__init__(self)   
-        self._control = control
-        self.mode = mode
-        self.maxAmp = maxAmp
-        self.minAmp = minAmp
-        self.num = num
-        self.wTime = wTime
-        self.mask = mask
-        self.withRunning = withRunning
-        self.clearFirst = clearFirst
-        self.radius = radius
-
-    def run(self):
-        self._control.varyZernAmp(self.mode, self.maxAmp, self.minAmp,
-                                  self.num, self.wTime, useMask=self.mask,
-                                  radius = self.radius,
-                                  clearfirst = self.clearFirst,
-                                  externallyCalled = self.withRunning)
-
-class ApplyManyZernRadiiToMirror(QtCore.QThread):
-    def __init__(self, control, mode, amp, maxR, minR, num,
-                 wTime, radius, mask, clearFirst, withRunning):
-
-        QtCore.QThread.__init__(self)   
-        self._control = control
-        self.mode = mode
-        self.amp = amp
-        self.maxR = maxR
-        self.minR = minR
-        self.num = num
-        self.wTime = wTime
-        self.mask = mask
-        self.withRunning = withRunning
-        self.clearFirst = clearFirst
-        self.radius = radius
-
-    def run(self):
-        self._control.varyZernRadii(self.mode, self.amp, self.maxR, self.minR,
-                                    self.num, self.wTime, useMask=self.mask,
-                                    radius = self.radius,
-                                    clearfirst = self.clearFirst,
-                                    externallyCalled = self.withRunning)
         
 class ApplyManyOffsetsToGroup(QtCore.QThread):
     def __init__(self, control, maxAmp, minAmp, num, wTime, clearFirst, withRunning):
@@ -394,136 +256,3 @@ class ApplyManyOffsetsToGroup(QtCore.QThread):
         self._control.varyGroupOffset(self.maxAmp,self.minAmp,self.num,self.wTime,
                                       clearfirst = self.clearFirst,
                                       externallyCalled = self.withRunning)
-
-class ApplyManyFromFile(QtCore.QThread):
-    def __init__(self, control, filename, wTime, withRunning):
-        QtCore.QThread.__init__(self)
-        self._control = control
-        self.wTime = wTime
-        self.withRunning = withRunning
-        self.filename = filename
-
-    def run(self):
-        self._control.varyArbitrary(self.filename, self.wTime,
-                                    externallyCalled = self.withRunning)
-        
-
-class ApplyManyMultsToMirror(QtCore.QThread):
-    def __init__(self, control, minMult, maxMult, num, wTime, withRunning):
-        QtCore.QThread.__init__(self)
-        self._control = control
-        self.wTime = wTime
-        self.withRunning = withRunning
-        self.minMult = minMult
-        self.maxMult = maxMult
-        self.num = num
-
-    def run(self):
-        self._control.varyMultiplierCurrent(self.minMult, self.maxMult, self.num,
-                                            self.wTime, externallyCalled = self.withRunning)
-
-class Modulation:
-    def __init__(self, index, ui):
-        self.index = index
-        self.checkbox = QtWidgets.QCheckBox(str(self.index))
-        self.checkbox.stateChanged.connect(ui._modulation_toggled)
-        self.checkbox.toggle()
-
-
-
-class FitResultsDialog(QtWidgets.QDialog):
-    
-    def __init__(self, PF, parent=None):
-        QtWidgets.QDialog.__init__(self, parent)
-        self.PF = PF
-        self.ui = fit_results_design.Ui_Dialog()
-        self.ui.setupUi(self)
-        self.ui.lineEditCoefficients.setText(str(PF.zernike_coefficients))
-        self.ui.mplwidget.figure.delaxes(self.ui.mplwidget.figure.axes[0])
-        axes_raw = self.ui.mplwidget.figure.add_subplot(131)
-        axes_raw.matshow(PF.phase, cmap='RdBu')
-        axes_raw.set_title('Raw data')
-        axes_fit = self.ui.mplwidget.figure.add_subplot(132)
-        axes_fit.matshow(PF.zernike, cmap='RdBu', vmin=PF.phase.min(), vmax=PF.phase.max())
-        axes_fit.set_title('Fit')
-        axes_coefficients = self.ui.mplwidget.figure.add_subplot(133)
-        axes_coefficients.bar(np.arange(15), PF.zernike_coefficients)
-        axes_coefficients.set_title('Zernike coefficients')
-
-
-    def getRemove(self):
-        return self.ui.checkBoxRemovePTTD.isChecked()
-
-
-class Scanner(QtCore.QThread):
-
-    def __init__(self, control, range_, nSlices, nFrames, center_xy, fname, maskRadius, maskCenter):
-        QtCore.QThread.__init__(self)
-        
-        self.control = control
-        self.range_ = range_
-        self.nSlices = nSlices
-        self.nFrames = nFrames
-        self.center_xy = center_xy
-        self.fname = fname
-        self.maskRadius = maskRadius
-        self.maskCenter = maskCenter
-
-    def run(self):
-        self.control.acquirePSF(self.range_, self.nSlices, self.nFrames,
-                                self.center_xy, self.fname,
-                                self.maskRadius, self.maskCenter)
-
-'''
-class RunningSharpness(QtCore.QThread):
-                                               
-    def __init__(self, control, im_size, maskRadius, maskCenter, pixelSize, diffLimit, plotWidget,
-                 varyZern=False):
-        QtCore.QThread.__init__(self)
-        self.control = control
-        self.pixelSize = pixelSize
-        self.diffLimit = diffLimit
-        self.maskRadius = maskRadius
-        self.maskCenter = maskCenter
-        self.plotWidget = plotWidget
-
-        self._on = True
-        self._varyZern = varyZern
-        self.numZernsToVary = 100
-        self._zerns = 0
-                                               
-
-        nx,ny = im_size
-
-        if maskCenter[0] > -1 and maskCenter[1]>-1:
-            x,y = np.meshgrid(np.arange(nx),np.arange(ny))
-            x -= maskCenter[0]
-            y -= maskCenter[1]
-            r_pxl = _msqrt(x**2 + y**2)
-            mask = r_pxl<maskRadius
-            self.mask = mask
-        else:
-            self.mask = None
-
-    def turnOff(self):
-        self._on = False
-
-    def run(self):
-        self._zerns = 0
-        while self._on:
-            sharpness, sharpnessList = self.control.findSharpnessEachFrame(self.pixelSize, self.diffLimit, self.mask)
-            if sharpness is not None:
-                if not self._varyZern:
-                    self.plotWidget.figure.axes[0].plot(sharpnessList)
-                    self.plotWidget.draw()
-                if self._varyZern:
-                    self.emit(QtCore.SIGNAL('nextModulation(int)'),self._zerns)
-                    time.sleep(0.1)
-                    self._zerns += 1
-                    if self._zerns == 101:
-                        self.plotWidget.figure.axes[0].plot(sharpnessList[-100:], '--ro')
-                        self.plotWidget.draw()
-                        self._on = False
-                        self.emit(QtCore.SIGNAL('doneAdvancingZern'))
-
-'''

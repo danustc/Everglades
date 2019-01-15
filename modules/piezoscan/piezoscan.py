@@ -111,6 +111,7 @@ class Control(inLib.Module):
         print("frame length:", frame_length)
         for ii in range(nSteps):
             if self.active:
+                print("step:", ii)
                 self._control.stage.goRelative(dx, dy)
                 time.sleep(2*frame_length)
                 for jj in range(nFrames):

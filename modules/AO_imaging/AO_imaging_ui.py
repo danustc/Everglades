@@ -34,9 +34,7 @@ class UI(inLib.ModuleUI):
         self._ui.buttonGroupGuess.addButton(self._ui.radioButtonPlane)
         self._ui.buttonGroupGuess.addButton(self._ui.radioButtonMirror)
         self._ui.buttonGroupGuess.addButton(self._ui.radioButtonFromFile)
-        self._ui.pushButton_zfit.clicked.connect(self.fitPF)
-        self._ui.pushButtonPhase.clicked.connect(self.retrievePF)
-
+        
         self._ui.doubleSpinBoxRange.setValue(self._control._settings['range'])
         self._ui.spinBoxSlices.setValue(self._control._settings['nSlices'])
         self._ui.spinBoxFrames.setValue(self._control._settings['nFrames'])
@@ -44,15 +42,16 @@ class UI(inLib.ModuleUI):
 
         self._ui.spinBoxIterations.setValue(self._control._settings['nIterations'])
         self._ui.pushButton_Acquire.clicked.connect(self.acquirePSF)
-        self._ui.pushButton_modulate.clicked.connect(self.modulate)
+        self._ui.pushButtonPhase.clicked.connect(self.retrievePF)
         self._ui.pushButton_save.clicked.connect(self.savePF)
+        self._ui.pushButton_ADM.clicked.connect(self.applyToMirror)
+
+
 
         self._ui.labelDisplay.paintEvent = self._labelDisplay_paintEvent
         clickable(self._ui.labelDisplay).connect(self._mousePressEvent)
 
 
-        self._ui.spinBox_zernModesToFit.setValue(self._control.zernModesToFit)
-        self._ui.spinBox_zernModesToFit.valueChanged.connect(self.setZernModesToFit)
 
         self.zernRadius = 0
 
@@ -61,8 +60,6 @@ class UI(inLib.ModuleUI):
         self.remove_PTTD = True
         self._pixmap = None
         self._scanner = None
-
-
 
         self._autoscale = True
         self.imsize = (256,256)
@@ -84,6 +81,14 @@ class UI(inLib.ModuleUI):
         self._updater.start(50)
         
 
+    def mirror_segs(self):
+        '''
+        pass the pattern to the DM and convert it into segments.
+        '''
+        self._control.mirror_segs()
+        
+
+
     def _displayPhase(self, phase):
         self._ui.mplwidget_PF.figure.axes[0].get_xaxis().set_visible(False)
         self._ui.mplwidget_PF.figure.axes[0].get_yaxis().set_visible(False)
@@ -93,36 +98,6 @@ class UI(inLib.ModuleUI):
 
     def _updateImSize(self):
         self.imsize = self._control.updateImSize()
-
-
-    def _modulation_toggled(self, state):
-        pass
-        '''
-        for m in self._modulations:
-            state = m.checkbox.isChecked()
-            self._control.setModulationActive(m.index, state)
-        if self.hasSLM:
-            self._ui_control.slm.updateModulationDisplay()
-        '''
-
-
-    def _modulations_toggled(self, state):
-        pass
-        '''
-        if state == False:
-            for m in self._modulations:
-                self._control.setModulationActive(m.index, state)
-        else:
-            self._modulation_toggled(state)
-        if self.hasSLM:
-            self._ui_control.slm.updateModulationDisplay()
-        '''
-
-    def set_modulations(self):
-        for m in self._modulations:
-            state = m.checkbox.isChecked()
-            self._control.setModulationActive(m.index, state)
-
 
 
     def acquirePSF(self):
@@ -140,55 +115,21 @@ class UI(inLib.ModuleUI):
         self._scanner.finished.connect(self._on_scan_done)
         self._ui.pushButton_Acquire.setEnabled(False)
         self._scanner.start()
-        self._updater.start()
+        # if self._scanner.finish():
+        
 
 
     def _on_scan_done(self):
         self._ui.pushButton_Acquire.setEnabled(True)
         self._ui.groupBoxPhase.setEnabled(True)
         time.sleep(1)
+        self._updater.start(50)
         
-      
-
-    def foundMaxArgSharp(self, argmax):
+     
+   
+    def retrievePF(self):
         '''
-        Connects to signal 'maxArgSharpness(int)'
-        '''
-        self._ui.label_sharpnessArgMax.setText("Arg. max: %i" % argmax)
-
-    def foundMaxFitSharp(self, fit):
-        self._ui.label_sharpnessFitMax.setText("Fit max: %.2f" % fit)
-
-    def advanceModulation(self, mod_index):
-        '''
-        Connected to signal 'nextModulation(int)' which is called by RunningSharpness
-
-        This is triggered each time a new pattern is to be displayed on the adaptive optics device.
-        '''
-        coeff = self._control.advanceModulation()
-        if self.hasSLM:
-            self._ui_control.slm.updateModulationDisplay() #updates display
-        self._ui.label_mod_index.setText("Index: %i" % mod_index)
-        self._ui.label_mod_value.setText("Value: %.2f" % coeff)
-
-    def fitPF(self):
-        PF = self._control.fit()
-        fit_result_dialog = FitResultsDialog(PF)
-        if fit_result_dialog.exec_():
-            print('AO_imaging: Fit accepted.')
-            self.use_zernike = True
-            remove = fit_result_dialog.getRemove()
-            if remove:
-                print('AO_imaging: Remove pistion, tip, tilt and defocus.')
-                PF = self._control.removePTTD()
-            self._displayPhase(PF.zernike)
-        else:
-            self.use_zernike = False
-
-
-    def retrievePF(self, crop = True):
-        '''
-        perform phase retrieval, crop if necessary.
+        perform phase retrieval
         '''
         pxlSize = self._ui.doubleSpinBoxPixel.value()
         l = self._ui.doubleSpinBoxWavelength.value()
@@ -196,6 +137,7 @@ class UI(inLib.ModuleUI):
         NA = self._ui.doubleSpinBoxNA.value()
         f = self._ui.doubleSpinBoxFocal.value()
         numWaves = self._ui.spinBox_numWavelengths.value()
+        dWave = self._ui.doubleSpinBox_dwave.value()
         neglect_defocus = self._ui.checkBoxNeglectDefocus.isChecked()
         nIt = self._ui.spinBoxIterations.value()
         invertPF = self._ui.checkBox_invertPF.isChecked()
@@ -214,30 +156,17 @@ class UI(inLib.ModuleUI):
             if filename:
                 guess = ('file', str(filename))
         if (guess[0] != 'file') or (guess[0] == 'file' and filename):
-            PF = self._control.retrievePF(pxlSize, l, n, NA, f, guess, nIt, neglect_defocus, invert=invertPF,wavelengths=numWaves, resetAmp=resetAmp,symmeterize=symmeterize)
+            PF = self._control.retrievePF(pxlSize, l, n, NA, f, guess, nIt, neglect_defocus, invert=invertPF,wavelengths=numWaves, wavestep = dWave, resetAmp=resetAmp,symmeterize=symmeterize)
             self._ui.tabWidget_viewer.setEnabled(True)
-            if crop:
-                PF_crop = pupil_crop(PF)
-            else:
-                self._displayPhase(PF)
+            
+        self._displayPhase(PF)
         self.use_zernike = False
 
 
-    def modulate(self): # pushButtonModulate triggering
-        modulation = Modulation(len(self._modulations), self)
-        self._ui.verticalLayoutModulations.insertWidget(0, modulation.checkbox)
-        self._modulations.append(modulation)
-        self._control.modulatePF(self.use_zernike)
-        if self.hasSLM:
-            self._ui_control.slm.updateModulationDisplay()
+    def applyToMirror(self):
+        #print("The function has not been defined. Please give it a definition.")
+        self._control.modulateMirror()
 
-    def modulateUnwrapped(self):
-        modulation = Modulation(len(self._modulations), self)
-        self._ui.verticalLayoutModulations.insertWidget(0, modulation.checkbox)
-        self._modulations.append(modulation)
-        self._control.modulatePF_unwrapped()
-        if self.hasSLM:
-            self._ui_control.slm.updateModulationDisplay()
 
     def savePF(self):
         filename = QtWidgets.QFileDialog.getSaveFileName(None,'Save to file',
@@ -249,9 +178,6 @@ class UI(inLib.ModuleUI):
         unwrappedPhase = self._control.unwrap()
         self._displayPhase(unwrappedPhase)
 
-    def setZernModesToFit(self):
-        nmodes = self._ui.spinBox_zernModesToFit.value()
-        self._control.setZernModesToFit(nmodes)
 
 
 
@@ -305,36 +231,11 @@ class Modulation:
 
 
 
-class FitResultsDialog(QtWidgets.QDialog):
-
-    def __init__(self, PF, parent=None):
-        QtWidgets.QDialog.__init__(self, parent)
-        self.PF = PF
-        self.ui = fit_results_design.Ui_Dialog()
-        self.ui.setupUi(self)
-        self.ui.lineEditCoefficients.setText(str(PF.zernike_coefficients))
-        self.ui.mplwidget.figure.delaxes(self.ui.mplwidget.figure.axes[0])
-        axes_raw = self.ui.mplwidget.figure.add_subplot(131)
-        axes_raw.matshow(PF.phase, cmap='RdBu')
-        axes_raw.set_title('Raw data')
-        axes_fit = self.ui.mplwidget.figure.add_subplot(132)
-        axes_fit.matshow(PF.zernike, cmap='RdBu', vmin=PF.phase.min(), vmax=PF.phase.max())
-        axes_fit.set_title('Fit')
-        axes_coefficients = self.ui.mplwidget.figure.add_subplot(133)
-        axes_coefficients.bar(np.arange(25), PF.zernike_coefficients)
-        axes_coefficients.set_title('Zernike coefficients')
-
-
-    def getRemove(self):
-        return self.ui.checkBoxRemovePTTD.isChecked()
-
-
 class Scanner(QtCore.QThread):
 
     def __init__(self, control, range_, nSlices, nFrames, center_xy, imagedest, maskRadius, maskCenter):
         QtCore.QThread.__init__(self)
-
-
+        
         self.control = control
         self.range_ = range_
         self.nSlices = nSlices
@@ -343,6 +244,8 @@ class Scanner(QtCore.QThread):
         self.imagedest = imagedest
         self.maskRadius = maskRadius
         self.maskCenter = maskCenter
+        
+
 
     def run(self):
         self.control.acquirePSF(self.range_, self.nSlices, self.nFrames,
