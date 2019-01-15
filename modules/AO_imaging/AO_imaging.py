@@ -4,7 +4,6 @@
 import inLib
 import numpy as np
 from myWidget import pupil
-from scipy.ndimage import interpolation
 from scipy.ndimage import gaussian_filter as gf
 from scipy import optimize
 import os
@@ -12,7 +11,7 @@ import time
 import libtim.zern
 from . import signalForAO
 from skimage.restoration import unwrap_phase
-
+from .deskew import deskew_stack
 # Constant parameter
 
 PXL = 0.097
@@ -70,7 +69,7 @@ class Control(inLib.Module):
 
 
     def acquirePSF(self, range_, nSlices, nFrames, center_xy=True, filename=None,
-                   mask_size = 40, mask_center = (-1,-1)):
+                   mask_size = 40, mask_center = (-1,-1), deskew = True):
         '''
         Acquires a PSF stack. The PSF is returned but also stored internally.
 
@@ -109,6 +108,9 @@ class Control(inLib.Module):
         origin_x, origin_y, origin_z = self._control.stage.position() 
         print("Positions:", origin_x, origin_y)
         scan = self._control.piezoscan.scan(start, end, nSlices, nFrames, filename)
+
+        if deskew:
+            scan = deskew_stack(scan, range_)
 
         nz, ny, nx = scan.shape
         # An empty PSF

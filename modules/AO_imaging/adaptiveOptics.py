@@ -149,7 +149,7 @@ class Control(inLib.Module):
         nz, ny, nx = scan.shape
         # An empty PSF
         PSF = np.zeros_like(scan)
-        g = pupil.Geometry((ny,nx), nx/2.-0.5, ny/2.-0.5, 16)
+        g = pupil.Geometry((ny,nx), ny/2.-0.5, nx/2.-0.5, 16)
         # cyl = np.array(nz*[g.r_pxl<16])
         new_cyl = np.array(nz*[g.r_pxl<mask_size])
         # Hollow cylinder
