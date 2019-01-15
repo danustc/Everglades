@@ -90,10 +90,18 @@ class UI(inLib.ModuleUI):
 
 
     def _displayPhase(self, phase):
-        self._ui.mplwidget_PF.figure.axes[0].get_xaxis().set_visible(False)
-        self._ui.mplwidget_PF.figure.axes[0].get_yaxis().set_visible(False)
-        self._ui.mplwidget_PF.figure.axes[0].matshow(phase, cmap='RdBu')
-        self._ui.mplwidget_PF.draw()
+        self._ui.mplwidget_phase.figure.axes[0].get_xaxis().set_visible(False)
+        self._ui.mplwidget_phase.figure.axes[0].get_yaxis().set_visible(False)
+        self._ui.mplwidget_phase.figure.axes[0].matshow(phase, cmap='RdBu')
+        self._ui.mplwidget_phase.draw()
+        
+    def _displayAmpli(self, ampli):
+        self._ui.mplwidget_ampli.figure.axes[0].get_xaxis().set_visible(False)
+        self._ui.mplwidget_ampli.figure.axes[0].get_yaxis().set_visible(False)
+        self._ui.mplwidget_ampli.figure.axes[0].matshow(ampli, cmap='RdBu')
+        self._ui.mplwidget_ampli.draw()
+
+        
 
 
     def _updateImSize(self):
@@ -156,10 +164,12 @@ class UI(inLib.ModuleUI):
             if filename:
                 guess = ('file', str(filename))
         if (guess[0] != 'file') or (guess[0] == 'file' and filename):
-            PF = self._control.retrievePF(pxlSize, l, n, NA, f, guess, nIt, neglect_defocus, invert=invertPF,wavelengths=numWaves, wavestep = dWave, resetAmp=resetAmp,symmeterize=symmeterize)
+            PF, Amp = self._control.retrievePF(pxlSize, l, n, NA, f, guess, nIt, neglect_defocus, invert=invertPF,wavelengths=numWaves, wavestep = dWave, resetAmp=resetAmp,symmeterize=symmeterize)
             self._ui.tabWidget_viewer.setEnabled(True)
             
         self._displayPhase(PF)
+        self._displayAmpli(Amp)
+        
         self.use_zernike = False
 
 

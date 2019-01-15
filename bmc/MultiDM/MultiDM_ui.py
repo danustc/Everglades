@@ -47,10 +47,7 @@ class UI(inLib.DeviceUI):
         self.pattern=None
 
         self._applyToMirrorThread = None
-        self._applyManyZernsThread = None
-        self._applyManyZernRadiiThread = None
         self._applyGroupOffsetsThread = None
-        self._applyManyMultsToMirrorThread = None
 
     def loadPattern(self):
         filename = QtWidgets.QFileDialog.getOpenFileName(None,'Open pattern','','*.npy')
@@ -71,7 +68,6 @@ class UI(inLib.DeviceUI):
     def clearPattern(self):
         self._control.clear()
         self._displayPhase(self._control.returnPattern())
-        self.reportGeo()
 
     def refreshPattern(self):
         self._displayPhase(self._control.returnPattern())
@@ -104,7 +100,6 @@ class UI(inLib.DeviceUI):
         npixels = int(self._ui.lineEdit_npixels.text())
         pattern = self._control.reconfigGeo(cx,cy,npixels)
         self._displayPhase(pattern)
-        self.reportGeo()
 
     def resetMirror(self):
         print("reset the mirror!")
@@ -151,14 +146,8 @@ class UI(inLib.DeviceUI):
         toPad = int(self._ui.lineEdit_pad.text())
         pattern = self._control.padZeros(toPad)
         self._displayPhase(pattern)
-        self.reportGeo()
 
-    def reportGeo(self):
-        npixels, cx, cy = self._control.getGeoParams()
-        self._ui.lineEdit_npixels.setText(str(npixels))
-        self._ui.lineEdit_cx.setText(str(int(cx)))
-        self._ui.lineEdit_cy.setText(str(int(cy)))
-
+   
     def calcZernike(self):
         mode = self._ui.spinBox_zernMode.value()
         amplitude = float(self._ui.lineEdit_zernAmp.text())

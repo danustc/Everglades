@@ -3,6 +3,7 @@ import time
 import numpy as np
 import subprocess
 from scipy.ndimage import rotate
+from myWidget.DM_simulate import DM
 
 class Control(inLib.Device):
     def __init__(self, settings):
@@ -15,20 +16,14 @@ class Control(inLib.Device):
         self.multiplier = 1.0
 
         self.preMultiplier = 80
-
         self.zernike = None
-
-
+        self.mirror = DM(self.segments, self.pixels)
+        self.mirror.findSeg()
         self.group = []
 
-        self.padding = False
-
         self.proc = None
-        self.numZernsToVary = 100
 
-    
-    def setup_dummy_mirror(self):
-        pass
+
 
     def highlight_dummy_mirror_segs(self, segs):
         self.group = segs
@@ -42,6 +37,12 @@ class Control(inLib.Device):
     def returnDummyMirror(self):
         return self.dummy_mirror.pattern, self.dummy_mirror.segOffsets
         
+    def setPattern(self, newPattern):
+        '''
+        pass the new pattern to the Deformable mirror
+        '''
+        print("I received the new pattern!")
+
 
     def loadPattern(self, pattern_filename, mult=1.0):
         self.mirror.pattern = np.load(str(pattern_filename)) * mult
@@ -50,7 +51,7 @@ class Control(inLib.Device):
     def loadSegments(self, filename):
         msegs = np.loadtxt(filename)
         #print "msegs: ", msegs
-        self.mirror.inputMirrorSegs(msegs)
+        self.mirror.readSeg(msegs)
         
     def patternRot90(self):
         if self.mirror.pattern is not None:
@@ -136,228 +137,12 @@ class Control(inLib.Device):
         return self.mirror.pattern
 
     def clear(self):
-        self.mirror.clear()
+        self.mirror.clearPattern()
 
     def setZernMode(self, mode):
         self.zernMode = mode
-    
-    def calcZernike(self, mode, amp, radius=None, useMask=True):
-        if radius is None:
-            radius = self.mirror.nPixels/2
-        modes = np.zeros((mode))
-        modes[mode-1]=amp
-        self.zernike = libtim.zern.calc_zernike(modes, radius, mask=useMask,
-                                                zern_data = {})
-        return self.zernike
 
-    def addZernike(self, zernike_pattern=None):
-        if zernike_pattern is not None:
-            zern = zernike_pattern
-        else:
-            if self.zernike is None:
-                return 0
-            else:
-                zern = self.zernike
-        if self.zernike is not None:
-            p=self.mirror.addToPattern(zern * self.preMultiplier)
-        return self.returnPattern()
 
-    def getNumberOfZernToVary(self):
-        return self.numZernsToVary
-
-    def varyMultiplierCurrent(self, minMult, maxMult, num, wTime, externallyCalled = False):
-        print(("The number of multipliers:", num))
-        print(("mininum:", minMult))
-        print(("maximum:",maxMult))
-        self.numZernsToVary = num
-        mults = np.linspace(minMult,maxMult,num)
-        filenms = []
-        baseline = self.returnPattern()
-        for i in range(num):
-            self.clear()
-            newPattern = baseline * mults[i]
-            self.mirror.setPattern(newPattern)
-            self.findSegments()
-            filenms.append("segFile_mult_%.2i.txt" % i)
-            self.mirror.outputSegs(filenms[i])
-        files_file = "allMultFiles_Max%.2i.txt" % maxMult
-        np.savetxt(files_file, np.array(filenms), fmt='%s', delimiter='\n')
-
-        time.sleep(0.1)
-
-        print("Finished creating files for varying multiplier for current pattern...")
-
-        wTimeStr = "%i" % wTime
-        numStr = "%i" % num
-
-        args = [self.executable, files_file, str(self.multiplier),numStr, wTimeStr]
-
-        if self.proc is not None:
-            print("Polling proc: ", self.proc.poll())
-            if self.proc.poll() is None:
-                self.proc.terminate()
-                self.proc.communicate()
-                self.proc = None
-
-        self.proc = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-        
-        if externallyCalled:
-            return 0
-        else:
-            if wTime<0:
-                for i in range(num):
-                    time.sleep(1)
-                    print("Going to next...")
-                    self.advancePatternWithPipe()
-            output = self.proc.stdout.read()
-            print("proc stdout: ", output)
-            return 1
-        
-
-    def varyZernAmp(self, mode, maxAmp, minAmp, num, wTime, radius=None, useMask=True, clearfirst=True,
-                    externallyCalled = False):
-        '''
-        Calls external C++ program that applies *num* different patterns of
-        Zernike mode *mode* to the mirror.
-
-        :Parameters:
-            *mode*: int
-                Zernike mode
-            *maxAmp*: float
-            *minAmp*: float
-            *num*: int
-            *wTime*: float
-                Time to wait in milliseconds before new pattern applied to mirror
-            *useMask*: boolean
-                Optional
-            *clearFirst*: boolean
-                Optional
-        '''
-        #mode = self.zernMode
-        self.numZernsToVary = num
-        amps = np.linspace(minAmp,maxAmp,num)
-        filenms = []
-        baseline = self.returnPattern()
-        for i in range(num):
-            if clearfirst:
-                self.clear() #clears mirror pattern and segments
-            else:
-                self.clear()
-                self.mirror.setPattern(baseline)
-            zern = self.calcZernike(mode, amps[i], radius=radius, useMask=useMask)
-            self.addZernike(zernike_pattern=zern)
-            self.findSegments()
-            filenms.append("segFile_mode%.3i_amp%.2i.txt" % (mode,i))
-            self.mirror.outputSegs(filenms[i])
-        files_file = "allSegFiles_%.3i.txt" % mode
-        np.savetxt(files_file, np.array(filenms), fmt='%s', delimiter='\n')
-
-        time.sleep(0.1)
-
-        print("Finished creating files for varying Zernike...")
-
-        wTimeStr = "%i" % wTime
-        numStr = "%i" % num
-
-        args = [self.executable, files_file, str(self.multiplier),numStr, wTimeStr] 
-
-        #subprocess.call([self.executable, files_file, str(self.multiplier),
-        #                 numStr, wTimeStr], shell=True)
-
-        if self.proc is not None:
-            print("Polling proc: ", self.proc.poll())
-            if self.proc.poll() is None:
-                self.proc.terminate()
-                self.proc.communicate()
-                self.proc = None
-
-        self.proc = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-        
-        if externallyCalled:
-            return 0
-        else:
-            if wTime<0:
-                for i in range(num):
-                    time.sleep(1)
-                    print("Going to next...")
-                    self.advancePatternWithPipe()
-            output = self.proc.stdout.read()
-            print("proc stdout: ", output)
-            return 1
-
-    def varyZernRadii(self, mode, amp, maxR, minR, num, wTime, radius=None, useMask=True, clearfirst=True,
-                      externallyCalled = False):
-        '''
-        Calls external C++ program that applies *num* different patterns of
-        Zernike mode *mode* to the mirror.
-
-        :Parameters:
-            *mode*: int
-                Zernike mode
-            *amp*: float
-                Zernike amplitude
-            *maxR*: float
-            *minR*: float
-            *num*: int
-            *wTime*: float
-                Time to wait in milliseconds before new pattern applied to mirror
-            *useMask*: boolean
-                Optional
-            *clearFirst*: boolean
-                Optional
-        '''
-        #mode = self.zernMode
-        self.numZernsToVary = num
-        rads = np.linspace(minR,maxR,num,dtype=np.uint16)
-        filenms = []
-        baseline = self.returnPattern()
-        for i in range(num):
-            if clearfirst:
-                self.clear() #clears mirror pattern and segments
-            else:
-                self.clear()
-                self.mirror.setPattern(baseline)
-            zern = self.calcZernike(mode, amp, radius=rads[i], useMask=useMask)
-            self.addZernike(zernike_pattern=zern)
-            self.findSegments()
-            filenms.append("segFile_mode%.3i_rad%.2i.txt" % (mode,i))
-            self.mirror.outputSegs(filenms[i])
-        files_file = "allSegFiles_%.3i.txt" % mode
-        np.savetxt(files_file, np.array(filenms), fmt='%s', delimiter='\n')
-
-        time.sleep(0.1)
-
-        print("Finished creating files for varying Zernike radii...")
-
-        wTimeStr = "%i" % wTime
-        numStr = "%i" % num
-
-        args = [self.executable, files_file, str(self.multiplier),numStr, wTimeStr] 
-
-        #subprocess.call([self.executable, files_file, str(self.multiplier),
-        #                 numStr, wTimeStr], shell=True)
-
-        if self.proc is not None:
-            print("Polling proc: ", self.proc.poll())
-            if self.proc.poll() is None:
-                self.proc.terminate()
-                self.proc.communicate()
-                self.proc = None
-
-        self.proc = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-        
-        if externallyCalled:
-            return 0
-        else:
-            if wTime<0:
-                for i in range(num):
-                    time.sleep(1)
-                    print("Going to next...")
-                    self.advancePatternWithPipe()
-            output = self.proc.stdout.read()
-            print("proc stdout: ", output)
-            return 1
-        
 
     def advancePatternWithPipe(self):
         if self.proc is not None:
@@ -375,7 +160,7 @@ class Control(inLib.Device):
     
     def applyToMirror(self, wtime=-1):
         #First save mirror
-        self.mirror.outputSegs(self.tempfilename)
+        self.mirror.exportSegs(self.tempfilename)
 
         #Wait to make sure file exists
         time.sleep(0.5)

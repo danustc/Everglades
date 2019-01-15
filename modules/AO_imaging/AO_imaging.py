@@ -38,6 +38,7 @@ class Control(inLib.Module):
 
         self._center = []
         self._PRcore = Core()
+        self.pattern = None
 
     def updateImSize(self):
         '''
@@ -101,7 +102,7 @@ class Control(inLib.Module):
         nz, ny, nx = scan.shape
         # An empty PSF
         PSF = np.zeros_like(scan)
-        self._PRcore.PSF = PSF # reset the psf
+        self._PSF = PSF # reset the psf
         if filename:
             np.save(filename, PSF)
         return PSF
@@ -134,10 +135,17 @@ class Control(inLib.Module):
         self._PRcore.objf = f # set all the properties
         self._PRcore.n_wave = wavelengths
         self._PRcore.d_wave = wavestep
+        self._PRcore.dz = self._dz
+        self._PRcore.load_psf(PSF = self._PSF, psf_path = None)
         self._PRcore.pupil_Simulation() # simulate a pupil
-        self._PRcore.retrievePF()
+        self._PRcore.retrievePF(nIt)
+        self.phase = self._PRcore.get_phase()
         
-       
+        # get cropped phase
+        
+        return self._PRcore.get_phase(), self._PRcore.get_ampli()
+        
+      
 
     def savePF(self, filename):
         '''
@@ -155,7 +163,6 @@ class Control(inLib.Module):
     def modulateMirror(self):
         '''
         Apply to mirror
-        1. Synthesize the pattern 
-        
+        1. pass the pattern to the 
         '''
-        pass
+        self._control.mirror.setPattern(self.phase)

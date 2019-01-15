@@ -1,6 +1,5 @@
 #!/usr/bin/python
 
 '''
-Python control for instruments by Boulder Nonlinear Systems.
+A python package for ASI MS-2000 XY stage
 '''
-

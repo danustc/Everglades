@@ -26,9 +26,11 @@ class Core(object):
         self.l= None
         self._NA = None
         self._nfrac = None
+        self._dz = None
         self.cf = None
         self.nw = 1
         self.dw = 0.005
+        self.zs = None
         print("Initialized!")
     # -----------------------Below is a couple of setting functions ---------------
     @property
@@ -86,22 +88,26 @@ class Core(object):
     def d_wave(self, new_dw):
         self.dw = new_dw
         
-    @property
-    def PSF(self):
-        return self._PSF
-    @PSF.setter
-    def PSF(self, new_PSF):
-        self._PSF = new_PSF
+        
+    @property 
+    def dz(self):
+        return self._dz
+    @dz.setter
+    def dz(self, new_dz):
+        self._dz = new_dz
+        
 
-    def load_psf(self,psf_path):
+    def load_psf(self, PSF = None, psf_path= None):
         '''
         load a psf function
         '''
-        ext =  os.path.basename(psf_path).split('.')[-1]
-        if ext == 'npy':
-            PSF = np.load(psf_path)
-        elif ext == 'tif':
-            PSF = tf.imread(psf_path)
+        if PSF is None:
+            print("load psf from file.")
+            ext =  os.path.basename(psf_path).split('.')[-1]
+            if ext == 'npy':
+                PSF = np.load(psf_path)
+            elif ext == 'tif':
+                PSF = tf.imread(psf_path)
 
         try:
             nz, ny, nx = PSF.shape
@@ -120,13 +126,6 @@ class Core(object):
         zs = zz-z_offset
         self.cz = int(-zs[0]//self.dz)
         self.zs = zs
-        print("psf loaded!")
-
-
-    def updateNA(self, new_NA):
-        self._NA = new_NA
-
-        self.PF.update(NA = new_NA)
 
 
     def pupil_Simulation(self):
@@ -151,11 +150,18 @@ class Core(object):
 
         return background
 
+    def background_hist(self):
+        hist, be = np.histogram(self.PSF, bins = 200)
+        int_peak = np.argmax(hist)
+        background = (be[int_peak] + be[int_peak+1])*0.5
+        return background
 
-    def retrievePF(self, p_diam, p_mask, nIt):
+    def retrievePF(self, nIt):
+        self.set_zrange()
         A = self.PF.plane # initial pupil function:plane
         Mx, My = np.meshgrid(np.arange(self.nx)-self.nx/2., np.arange(self.nx)-self.nx/2.)
-        background = self.background_reset(mask = p_mask, psf_diam = p_diam)
+        #background = self.background_reset(mask = p_mask, psf_diam = p_diam)
+        background = self.background_hist()
         print( "   background = ", background)
         PSF_sample = self.PSF
         complex_PF = self.PF.psf2pf(PSF_sample, self.zs, background, A, nIt)
@@ -186,6 +192,10 @@ class Core(object):
             return cropped_ampli
         else:
             return self.pf_ampli
+        
+        
+    def get_kpxl(self):
+        return self.k_pxl
 
 
     def strehl_ratio(self):
