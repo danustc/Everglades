@@ -4,7 +4,6 @@
 from PyQt5 import QtWidgets,QtCore
 import inLib
 import numpy as np
-from numpy.lib.scimath import sqrt as _msqrt
 import threading
 
 class UI(inLib.DeviceUI):
@@ -37,14 +36,14 @@ class UI(inLib.DeviceUI):
 
         self._ui.pushButton_loadSegs.clicked.connect(self.loadSegs)
 
-        self.varyfilename = None
-
         self._ui.lineEdit_loadMult.setText("10")
         self._ui.lineEdit_npixels.setText(str(self._control.pixels))
         self._ui.lineEdit_zernAmp.setText("0")
         self._ui.lineEdit_premult.setText(str(self._control.preMultiplier))
 
         self.pattern=None
+        self.zcoeffs = np.zeros(30) # up to 30th mode
+        
 
         self._applyToMirrorThread = None
         self._applyGroupOffsetsThread = None
@@ -55,9 +54,6 @@ class UI(inLib.DeviceUI):
         pattern = self._control.loadPattern(filename, m)
         self._displayPhase(pattern)
 
-    def loadVaryFile(self):
-        self.varyfilename = QtWidgets.QFileDialog.getOpenFileName(None,'Open list of files file','','*.*')
-        self._ui.label_filenameloaded.setText(self.varyfilename)
 
     def loadSegs(self):
         filename = QtWidgets.QFileDialog.getOpenFileName(None,'Open segments','','*.*')
@@ -119,45 +115,39 @@ class UI(inLib.DeviceUI):
         self._applyToMirrorThread.start()
         #self._control.applyToMirror()
 
-
-
-    def toMirrorGroupVary(self):
-        maxAmp = float(self._ui.lineEdit_maxZAmp.text())
-        minAmp = float(self._ui.lineEdit_minZAmp.text())
-        num = self._ui.spinBox_numZerns.value()
-        wTime = int(self._ui.lineEdit_wTime.text())
-        withRunning = self._ui.checkBox_zernWithSharpness.isChecked()
-        clearFirst = self._ui.checkBox_clearFirst.isChecked()
-        self._applyGroupOffsetsThread = ApplyManyOffsetsToGroup(self._control, maxAmp,
-                                                                minAmp, num, wTime,
-                                                                clearFirst,
-                                                                withRunning)
-        self._applyGroupOffsetsThread.start()
-
     def pokeSegment(self):
         segment = self._ui.spinBox_segment.value()
         toAdd = int(self._ui.lineEdit_pokeval.text())
         pokeAll = self._ui.checkBox_pokeAll.isChecked()
         self._control.pokeSegment(segment-1,toAdd,pokeAll=pokeAll)
         self._displayPhase(self._control.returnPattern())
-        self._displaySegments(self._control.returnSegments())
+        self._displaySegments(self._control.getSegments())
 
     def padZeros(self):
         toPad = int(self._ui.lineEdit_pad.text())
         pattern = self._control.padZeros(toPad)
         self._displayPhase(pattern)
 
+
+    # --------------------------------------Zernike-associated functions ---------------------------
    
     def calcZernike(self):
+        '''
+        Calculate zernike of selected mode and amplitude
+        '''
         mode = self._ui.spinBox_zernMode.value()
         amplitude = float(self._ui.lineEdit_zernAmp.text())
         mask = self._ui.checkBox_zernMask.isChecked()
         radius = int(self._ui.lineEdit_zernRad.text())
-        zern = self._control.calcZernike(mode, amplitude, radius=radius, useMask=mask)
-        self._displayZern(zern)
+        zern_newmode = self._control.calcZernike(mode, amplitude, radius=radius, useMask=mask)
+        self._displayZern(zern_newmode)
+        
 
     def modZernike(self):
-        pattern = self._control.addZernike()
+        '''
+        Suppose the zernike has been
+        '''
+        Segs = self._control.modZernike()
         self._displayPhase(pattern)
 
     def createGroup(self):
@@ -230,18 +220,3 @@ class ApplyToMirror(QtCore.QThread):
 
 
         
-class ApplyManyOffsetsToGroup(QtCore.QThread):
-    def __init__(self, control, maxAmp, minAmp, num, wTime, clearFirst, withRunning):
-        QtCore.QThread.__init__(self)
-        self._control = control
-        self.maxAmp = maxAmp
-        self.minAmp = minAmp
-        self.num = num
-        self.wTime = wTime
-        self.withRunning = withRunning
-        self.clearFirst = clearFirst
-
-    def run(self):
-        self._control.varyGroupOffset(self.maxAmp,self.minAmp,self.num,self.wTime,
-                                      clearfirst = self.clearFirst,
-                                      externallyCalled = self.withRunning)

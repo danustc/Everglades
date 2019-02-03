@@ -155,14 +155,14 @@ class Control(inLib.Module):
             *filename*: str
         '''
         working_dir = self._control.getWorkingDir()
-        np.save(os.path.join(working_dir, filename + '_complex.npy'), self._PF.complex)
-        np.save(os.path.join(working_dir, filename + '_amplitude.npy'), self._PF.amplitude)
-        np.save(os.path.join(working_dir, filename + '_phase.npy'), self._PF.phase)
+        np.save(os.path.join(working_dir, filename + '_phase.npy'), self._PRcore.get_phase())
+        np.save(os.path.join(working_dir, filename + '_amplitude.npy'), self._PRcore.get_ampli())
 
 
     def modulateMirror(self):
         '''
         Apply to mirror
-        1. pass the pattern to the 
+        1. pass the pattern to the DM
+        2. 
         '''
         self._control.mirror.setPattern(self.phase)

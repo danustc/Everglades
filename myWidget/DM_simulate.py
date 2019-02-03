@@ -30,6 +30,16 @@ class DM(object):
             self.pattern = MOD
 
 
+    def addOffset(self, seg, value):
+        if seg<0:
+            self.DMsegs+= value
+            self.pattern += value
+        else:
+            unraveled = np.unravel_index(seg, [self.nSegments, self.nSegments])
+            self.DMsegs[unraveled[0],unraveled[1]] += value
+            w = self.whereSegment(seg)
+            self.pattern[w] += value
+
     def findSeg(self):
         for ii in np.arange(self.nSegments):
             for jj in np.arange(self.nSegments):
@@ -45,6 +55,16 @@ class DM(object):
         print(DMsegs.max(), DMsegs.min())
         return DMsegs
 
+
+    def whereSegment(self, seg):
+        temp = np.zeros_like(self.pattern)
+        unraveled = np.unravel_index(seg, [self.nSegments, self.nSegments])
+        xStart = self.borders[unraveled[0]]
+        xStop = self.borders[unraveled[0]+1]
+        yStart = self.borders[unraveled[1]]
+        yStop = self.borders[unraveled[1]+1]
+        temp[xStart:xStop,yStart:yStop] = 1
+        return np.where(temp==1)
 
     def readSeg(self, raw_seg):
         """
@@ -67,7 +87,7 @@ class DM(object):
         convert into segment patterns.
         """
         self.pattern = lzern.calc_zernike(z_ampli, self.radius, mask = self.useMask, zern_data = {})
-        self.findSeg()
+        return self.findSeg()
         # done with zernSeg
 
     def setPattern(self, newPattern):

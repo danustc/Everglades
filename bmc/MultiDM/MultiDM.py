@@ -117,7 +117,7 @@ class Control(inLib.Device):
         return self.returnPattern()
 
     def findSegments(self):
-        self.mirror.findSegOffsets()
+        self.mirror.findSeg()
 
     def setMultiplier(self,mult):
         self.multiplier = mult
@@ -126,12 +126,9 @@ class Control(inLib.Device):
         self.preMultiplier = mult
 
     def getSegments(self):
-        return self.mirror.returnSegs()
+        return self.mirror.getSegs()
         #return self.mirror.segOffsets
 
-    def returnSegments(self):
-        return self.mirror.returnSegs()
-        #return self.mirror.segOffsets
 
     def returnPattern(self):
         return self.mirror.pattern
@@ -139,10 +136,25 @@ class Control(inLib.Device):
     def clear(self):
         self.mirror.clearPattern()
 
-    def setZernMode(self, mode):
-        self.zernMode = mode
+    # -------------------------------------Below are Zernike-associated functions
 
 
+    def modZernike(self, zcoefs, rm4 = True):
+        '''
+        receive zernike coefficients as input, synthesize the pattern and mod
+        '''
+        NZ = len(zcoefs)
+        if rm4:
+            zcoefs_comp = np.zeros(NZ+4)
+            zcoefs_comp[4:] = zcoefs
+        else:
+            zcoefs_comp = zcoefs
+            
+        Segs = self.mirror.zernSeg(zcoefs_comp) 
+        self.applyToMirror()
+        return Segs# return the segments
+        
+        
 
     def advancePatternWithPipe(self):
         if self.proc is not None:

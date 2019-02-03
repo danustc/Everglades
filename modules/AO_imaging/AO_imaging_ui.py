@@ -4,7 +4,6 @@
 from PyQt5 import QtWidgets,QtCore, QtGui
 import inLib
 import numpy as np
-from . import fit_results_design
 import time
 from myWidget import QExtensions as qext
 
@@ -84,18 +83,19 @@ class UI(inLib.ModuleUI):
     def mirror_segs(self):
         '''
         pass the pattern to the DM and convert it into segments.
+        save the mirror segs as a temporary file
         '''
         self._control.mirror_segs()
         
 
 
-    def _displayPhase(self, phase):
+    def displayPhase(self, phase):
         self._ui.mplwidget_phase.figure.axes[0].get_xaxis().set_visible(False)
         self._ui.mplwidget_phase.figure.axes[0].get_yaxis().set_visible(False)
         self._ui.mplwidget_phase.figure.axes[0].matshow(phase, cmap='RdBu')
         self._ui.mplwidget_phase.draw()
         
-    def _displayAmpli(self, ampli):
+    def displayAmpli(self, ampli):
         self._ui.mplwidget_ampli.figure.axes[0].get_xaxis().set_visible(False)
         self._ui.mplwidget_ampli.figure.axes[0].get_yaxis().set_visible(False)
         self._ui.mplwidget_ampli.figure.axes[0].matshow(ampli, cmap='RdBu')
@@ -169,6 +169,7 @@ class UI(inLib.ModuleUI):
             
         self._displayPhase(PF)
         self._displayAmpli(Amp)
+        
         
         self.use_zernike = False
 
