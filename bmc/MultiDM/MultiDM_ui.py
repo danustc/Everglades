@@ -25,6 +25,7 @@ class UI(inLib.DeviceUI):
         self._ui.pushButton_premult.clicked.connect(self.setPreMultiplier)
         self._ui.pushButton_poke.clicked.connect(self.pokeSegment)
         self._ui.pushButton_clear.clicked.connect(self.clearPattern)
+        self._ui.pushButton_clearZern.clicked.connect(self.clearZern)
         self._ui.pushButton_refresh.clicked.connect(self.refreshPattern)
         self._ui.pushButton_pad.clicked.connect(self.padZeros)
         self._ui.pushButton_setmode.clicked.connect(self.calcMode)
@@ -63,6 +64,10 @@ class UI(inLib.DeviceUI):
     def clearPattern(self):
         self._control.clear()
         self._displayPhase(self._control.returnPattern())
+
+    def clearZern(self):
+        self.zcoeffs[:] = 0
+        self.syncMode()
 
     def refreshPattern(self):
         self._displayPhase(self._control.returnPattern())
@@ -144,10 +149,10 @@ class UI(inLib.DeviceUI):
         '''
         synchronize current amplitudes into a pattern
         '''
-        self._control.calcZernike()
+        mask = self._ui.checkBox_zernMask.isChecked()
+        sync_pattern = self._control.calcZernike(0, self.zcoeffs, useMask = mask)
+        self._displayZern(sync_pattern)
 
-    def clearMode(self):
-        self.zcoeffs[:] = 0
 
     def modZernike(self):
         '''

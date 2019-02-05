@@ -148,7 +148,8 @@ class Control(inLib.Device):
             zm = np.zeros(mode)
             zm[-1] = amplitude
         else:
-            pass
+            # put in a list of amplitude and synthesize the pupil function
+            zm = amplitude
         zm_pattern = self.mirror.zernSeg(zm, conv_seg = False)
         return zm_pattern
 
