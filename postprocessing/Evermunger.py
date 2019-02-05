@@ -10,12 +10,13 @@ global_datapath = '/home/sillycat/Programming/Python/data_test/Everglades/Nov27_
 
 
 sq2 = np.sqrt(0.5)
-transform_mat = np.array([
+deskew_mat = np.array([
     [0., -1, 0.],
     [sq2, 0., sq2],
     [-sq2, 0., sq2]
-    ]) # the transform matrix between the lab frame and the image frame
+    ]) # the deskew matrix between the lab frame and the image frame
 
+<<<<<<< HEAD
 def _phase_construct_(NK, x0, shift = True):
     HK = int(NK//2)
     kk = np.arange(NK)-HK
@@ -37,6 +38,9 @@ def shift_fourier(img, dy, dx = 0.):
     return np.abs(img_shifted)
 
 def transform(stack, scan_range = 6.0, pxl = 0.103, method = 'direct'):
+=======
+def deskew(stack, scan_range = 6.0, pxl = 0.103):
+>>>>>>> ea6477893c333f21d5e8a05429c308af567fa5a2
     '''
     img: the raw image acquired
     scan_range: the range of Z-scanning, unit micron.
@@ -75,8 +79,12 @@ def main():
     SC_list = glob.glob(global_datapath + '*SC*.npy')
     RC_list = glob.glob(global_datapath + '*RC*.npy')
     SC_psf = np.load(SC_list[0])
+<<<<<<< HEAD
     padded_stack = transform(SC_psf, method = 'fourier').astype('uint16')
     tf.imsave('SC_padded_ft.tif', padded_stack)
+=======
+    padded_stack = deskew(SC_psf).astype('uint16')
+>>>>>>> ea6477893c333f21d5e8a05429c308af567fa5a2
 
     RC_psf = np.load(RC_list[0])
     padded_stack = transform(RC_psf, method = 'fourier').astype('uint16')

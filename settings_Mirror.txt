@@ -4,9 +4,9 @@ devices:
     syringePumps:
         manufacturer: harvardapparatus
         model: pump
-        active: false
+        active: false 
         settings:
-            port: COM3
+            port: COM11
 
     mirror:
         active: true
@@ -78,7 +78,7 @@ devices:
     camera:
         manufacturer: hamamatsu
         model: orcaflash
-        active: false
+        active: true 
         settings:
             temperature: 20
             exposure_time: 0.4        # in milliseconds
@@ -109,7 +109,7 @@ devices:
     stage:
         manufacturer: marzhauser
         model: stage
-        active: false
+        active: true 
         settings:
             step: 1.0
     servo:
@@ -163,11 +163,11 @@ modules:
     testing:
         active: false
         settings: null
-    adaptiveOptics:
-        active: false
-        settings: {filename: psfm01.npy, nFrames: 2, nIterations: 4, nSlices: 11, range: 4.0, hasSLM: false, hasMirror: true}
+    AO_imaging:
+        active: true 
+        settings: {filename: psfm01.npy, nFrames: 2, nIterations: 4, nSlices: 11, range: 4.0, hasSLM: false, hasMirror: true, scan_device: marzhauser}
     piezoscan:
-        active: false
+        active: true 
         settings: 
             ThorlabsMotor: false 
             Marzhauser: true

@@ -5,7 +5,7 @@ import inLib
 import numpy as np
 from Utilities import zernike
 #from Utilities import pupil_forInControl as pupil
-from . import pupil_forInControl as pupil
+from myWidget import pupil
 from scipy.ndimage import interpolation
 from scipy.ndimage import gaussian_filter as gf
 from scipy import optimize
@@ -15,8 +15,8 @@ import matplotlib.pyplot as plt
 import libtim
 import libtim.zern
 from . import signalForAO
-import skimage
 from skimage.restoration import unwrap_phase
+from .deskew import deskew_stack
 
 # Constant parameter
 
@@ -29,13 +29,11 @@ GS = 'plane'
 
 
 
-
 class Control(inLib.Module):
 
     def __init__(self, control, settings):
         print('Initializing Adaptive Optics.')
         inLib.Module.__init__(self, control, settings)
-        dim = self._control.camera.getDimensions()
         # A list to store the indices of the 'Other' modulations, given by the SLM API:
         self._modulations = []
         print('Adaptive Optics initialized.')
@@ -59,8 +57,7 @@ class Control(inLib.Module):
         self._zernFitUnwrappedModes = None
 
         self.varyAOactive = True
-
-
+        self.current_Pattern = None
         self._center = []
 
 
@@ -104,44 +101,9 @@ class Control(inLib.Module):
         if self.hasMirror:
             self._control.mirror.setOtherActive(other_index, state)
 
-    def acquireImagesVaryAO(self, nPatterns, nFrames,
-                            filename=None):
-        '''
-        Acquires a stack of images while varying the mirror in some way...
-        '''
-
-        if self.hasMirror:
-            ao = self._control.mirror
-        elif self.hasSLM:
-            ao = self._control.slm
-        else:
-            return None
-        if not self.varyAOactive:
-            return None
-
-        dim = self._control.camera.getDimensions()
-        data = np.zeros((nSteps,) + dim)
-        slicesFrames = np.zeros((nFrames,)+dim)
-
-        for i in range(nPatterns):
-            ao.advancePatternWithPipe()
-            for j in range(nFrames):
-                im = self._control.camera.getMostRecentImageNumpy()
-                if im is None:
-                    time.sleep(frame_length)
-                    im = self._control.camera.getMostRecentImageNumpy()
-                slicesFrames[j] = im
-                time.sleep(frame_length)
-            data[i] = np.mean(slicesFrames, axis=0)
-        if filename:
-            print("ao: Saving vary ao to ", filename)
-            np.save(filename, data)
-        return data
-
-
 
     def acquirePSF(self, range_, nSlices, nFrames, center_xy=True, filename=None,
-                   mask_size = 40, mask_center = (-1,-1)):
+                   mask_size = 40, mask_center = (-1,-1), deskew = True):
         '''
         Acquires a PSF stack. The PSF is returned but also stored internally.
 
@@ -170,25 +132,30 @@ class Control(inLib.Module):
         self.filename = filename
 
         # Some parameters
-        start = range_/2.0
-        end = -range_/2.0
-        if self._settings['scan_device'] == 'marzhauser'
+        # Added by Dan on Nov27, 2018: 
+        start = range_/np.sqrt(2.0)
+        end = -range_/np.sqrt(2.0) # The x and z directions are coupled, and the scan range should be scaled up by sqrt(2)
+        #start = range_/2.0
+        #end = -range_/2.0
+        if self._settings['scan_device'] == 'marzhauser':
             start,end = end, start # the direction of the thorlab motor and the marzhauser stage are opposite
         self._dz = abs(range_/(nSlices-1.0))
 
         # Scan the PSF:
         scan = self._control.piezoscan.scan(start, end, nSlices, nFrames, filename)
-
-        nz, nx, ny = scan.shape
+        if deskew:
+            scan = deskew_stack(scan, range_)
+        
+        nz, ny, nx = scan.shape
         # An empty PSF
         PSF = np.zeros_like(scan)
-        g = pupil.Geometry((nx,ny), nx/2.-0.5, ny/2.-0.5, 16)
+        g = pupil.Geometry((ny,nx), ny/2.-0.5, nx/2.-0.5, 16)
         # cyl = np.array(nz*[g.r_pxl<16])
         new_cyl = np.array(nz*[g.r_pxl<mask_size])
         # Hollow cylinder
         hcyl = np.array(nz*[np.logical_and(g.r_pxl>=50, g.r_pxl<61)])
         if mask_center[0] > -1:
-            g2 = pupil.Geometry((nx,ny), mask_center[0], mask_center[1], 16)
+            g2 = pupil.Geometry((ny,nx), mask_center[0], mask_center[1], 16)
             mask = g2.r_pxl<mask_size
         else:
             mask = g.r_pxl<mask_size
@@ -214,7 +181,9 @@ class Control(inLib.Module):
             self._background = np.mean(scan[hcyl])
         PSF[np.logical_not(new_cyl)] = self._background
 
+
         self._PSF = PSF
+
         if filename:
             np.save(filename, PSF)
         return PSF
@@ -224,7 +193,7 @@ class Control(inLib.Module):
         Finds the sharpnes of self._PSF
         '''
         if self._PSF is None:
-            time.sleep(2)
+            time.sleep(1)
         sharpness = signalForAO.secondMomentOnStack(self._PSF,pixelSize,diffLimit)
         self._sharpness = sharpness
         print("Maximum sharpness = ", sharpness.max())
@@ -452,6 +421,14 @@ class Control(inLib.Module):
         return self._PF
 
 
+    def direct_modulate(self):
+        '''
+        directly apply current DM pattern onto the mirror.
+        '''
+        self._control.mirror.mirror.setPattern()
+        
+
+
     def modulatePF(self, use_zernike=True):
         '''
         Sends phase of the current internally stored pupil function to the SLM.
@@ -494,8 +471,6 @@ class Control(inLib.Module):
             # Added by Dan on 08/26, save automatically the zernike-fitted pupil. re
             # Added by Dan on 09/02, save the zernike-fitted pupil without mask, but when apply,
             # apply the masked one so that the patterns can be visualized clearer.
-            Rmod = geometry.d/2.0
-
 
             np.save(self.filename+'_zfit', MOD)
 
@@ -520,12 +495,13 @@ class Control(inLib.Module):
             MOD = interpolation.shift(MOD,(cy-255.5,cx-255.5),order=0,
                                                    mode='nearest')
             # Cut out center 512x512:
-            c = MOD.shape[0]/2
+            c = int(MOD.shape[0]/2)
             MOD = MOD[c-256:c+256,c-256:c+256]
 
 
         # Add an 'Other' modulation using the SLM API. Store the index in _modulations:
         #index = self._control.slm.addOther(MOD)
+        print("add mod:")
         index = self._addMOD(MOD)
         self._modulations.append(index)
         return index
@@ -552,7 +528,7 @@ class Control(inLib.Module):
         MOD = interpolation.shift(MOD,(cy-255.5,cx-255.5),order=0,
                                                        mode='nearest')
         # Cut out center 512x512:
-        c = MOD.shape[0]/2
+        c = int(MOD.shape[0]/2)
         MOD = MOD[c-256:c+256,c-256:c+256]
 
 

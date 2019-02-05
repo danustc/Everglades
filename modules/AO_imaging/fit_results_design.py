@@ -8,7 +8,7 @@
 # WARNING! All changes made in this file will be lost!
 
 from PyQt5 import QtCore, QtWidgets
-from myWidgets.matplotlibwidget import MatplotlibWidget
+from myWidget.matplotlibwidget import MatplotlibWidget
 
 try:
     _fromUtf8 = QtCore.QString.fromUtf8

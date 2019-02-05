@@ -15,6 +15,7 @@ class API():
         self.live = []
         num_of_ports = len(ports)
         print("Ports:", ports)
+        self.end_of_line = end_of_line
         for i in range(0,num_of_ports):
             print(ports[i])
             try:
@@ -23,12 +24,13 @@ class API():
                 print("new port:", ser)
                 self.tty.append(ser)
                 #self.tty.append(uspp.SerialPort(ports[i], timeout, baudrate))
-                self.tty[i].flush()
-                self.end_of_line = end_of_line
                 self.wait_time = wait_time
-                self.live.append(1)
                 time.sleep(self.wait_time)
+                #self.tty[i].flush()
+                time.sleep(self.wait_time)
+                self.live.append(1)
             except:
+                print("Error importing laser:", ports[i])
                 self.live.append(0)
 
     def commWithResp(self, port_num, command):
