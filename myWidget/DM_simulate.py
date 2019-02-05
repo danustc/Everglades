@@ -81,13 +81,16 @@ class DM(object):
         return rseg
 
 
-    def zernSeg(self, z_ampli):
+    def zernSeg(self, z_ampli, conv_seg = True):
         """
         Take amplitudes of zernike modes and synthesize into a pattern;
         convert into segment patterns.
         """
         self.pattern = lzern.calc_zernike(z_ampli, self.radius, mask = self.useMask, zern_data = {})
-        return self.findSeg()
+        if conv_seg:
+            return self.findSeg()
+        else:
+            return self.getPattern()
         # done with zernSeg
 
     def setPattern(self, newPattern):
