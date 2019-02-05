@@ -138,15 +138,20 @@ class Control(inLib.Device):
 
     # -------------------------------------Below are Zernike-associated functions
 
-    def calcZernike(self, mode, amplitude):
+    def calcZernike(self, mode, amplitude, useMask):
         '''
         calculate the single mode of Zernike
         Not modulating, just calculate a pattern
         '''
-        zm = np.zeros(mode)
-        zm[-1] = amplitude
+        self.mirror.mask = useMask
+        if mode > 0:
+            zm = np.zeros(mode)
+            zm[-1] = amplitude
+        else:
+            pass
         zm_pattern = self.mirror.zernSeg(zm, conv_seg = False)
         return zm_pattern
+
 
     def modZernike(self, zcoefs, rm4 = True):
         '''

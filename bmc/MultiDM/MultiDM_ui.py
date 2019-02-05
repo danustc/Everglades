@@ -34,6 +34,7 @@ class UI(inLib.DeviceUI):
         self._ui.pushButton_reset.clicked.connect(self.resetMirror)
 
         self._ui.pushButton_loadSegs.clicked.connect(self.loadSegs)
+        self._ui.pushButton_apply.clicked.connect(self.syncMode)
 
         self._ui.lineEdit_loadMult.setText("10")
         self._ui.lineEdit_npixels.setText(str(self._control.pixels))
@@ -42,7 +43,6 @@ class UI(inLib.DeviceUI):
 
         self.pattern=None
         self.zcoeffs = np.zeros(30) # up to 30th mode
-        
 
         self._applyToMirrorThread = None
         self._applyGroupOffsetsThread = None
@@ -135,10 +135,19 @@ class UI(inLib.DeviceUI):
         '''
         mode = self._ui.spinBox_zernMode.value()
         amplitude = float(self._ui.lineEdit_zernAmp.text())
+        self.zcoeffs[mode-1] = amplitude
         mask = self._ui.checkBox_zernMask.isChecked()
-        radius = int(self._ui.lineEdit_zernRad.text())
-        zern_newmode = self._control.calcZernike(mode, amplitude, radius=radius, useMask=mask)
+        zern_newmode = self._control.calcZernike(mode, amplitude, useMask=mask)
         self._displayZern(zern_newmode)
+
+    def syncMode(self):
+        '''
+        synchronize current amplitudes into a pattern
+        '''
+        self._control.calcZernike()
+
+    def clearMode(self):
+        self.zcoeffs[:] = 0
 
     def modZernike(self):
         '''
