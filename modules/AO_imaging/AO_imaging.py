@@ -163,6 +163,7 @@ class Control(inLib.Module):
         '''
         Apply to mirror
         1. pass the pattern to the DM
-        2. 
+        2. Modulate DM
         '''
         self._control.mirror.setPattern(self.phase)
+        self._control.mirror.applyToMirror()

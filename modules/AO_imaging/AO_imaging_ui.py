@@ -166,11 +166,8 @@ class UI(inLib.ModuleUI):
         if (guess[0] != 'file') or (guess[0] == 'file' and filename):
             PF, Amp = self._control.retrievePF(pxlSize, l, n, NA, f, guess, nIt, neglect_defocus, invert=invertPF,wavelengths=numWaves, wavestep = dWave, resetAmp=resetAmp,symmeterize=symmeterize)
             self._ui.tabWidget_viewer.setEnabled(True)
-            
         self._displayPhase(PF)
         self._displayAmpli(Amp)
-        
-        
         self.use_zernike = False
 
 
