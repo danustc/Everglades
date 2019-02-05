@@ -143,7 +143,7 @@ class UI(inLib.DeviceUI):
         self.zcoeffs[mode-1] = amplitude
         mask = self._ui.checkBox_zernMask.isChecked()
         zern_newmode = self._control.calcZernike(mode, amplitude, useMask=mask)
-        self._displayZern(zern_newmode)
+        self._displayPhase(zern_newmode)
 
     def syncMode(self):
         '''
@@ -151,15 +151,15 @@ class UI(inLib.DeviceUI):
         '''
         mask = self._ui.checkBox_zernMask.isChecked()
         sync_pattern = self._control.calcZernike(0, self.zcoeffs, useMask = mask)
-        self._displayZern(sync_pattern)
+        self._displayPhase(sync_pattern)
 
 
     def modZernike(self):
         '''
         Suppose the zernike has been
         '''
-        Segs = self._control.modZernike()
-        self._displayPhase(pattern)
+        Segs = self._control.modZernike(self.zcoeffs, rm4 = False)
+        self._displaySegments(Segs)
 
     def createGroup(self):
         groupStr = self._ui.lineEdit_group.text()
@@ -177,17 +177,13 @@ class UI(inLib.DeviceUI):
         self._displayPhase(self._control.returnPattern())
         self._displaySegments(self._control.returnSegments())
 
-    
+
     def _displayDummyPattern(self, pattern):
         if pattern is not None:
             self._ui.mplwidgetGrouped.figure.axes[0].matshow(pattern, cmap='RdBu')
             self._ui.mplwidgetGrouped.draw()
 
-    def _displayZern(self, zernike):
-        if zernike is not None:
-            self._ui.mplwidgetZern.figure.axes[0].matshow(zernike, cmap='RdBu')
-            self._ui.mplwidgetZern.draw()
-        
+
     def _displayPhase(self, phase):
         if phase is not None:
             self._ui.mplwidgetPhase.figure.axes[0].matshow(phase, cmap='RdBu')

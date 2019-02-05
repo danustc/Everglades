@@ -36,11 +36,12 @@ class Control(inLib.Device):
 
     def returnDummyMirror(self):
         return self.dummy_mirror.pattern, self.dummy_mirror.segOffsets
-        
+
     def setPattern(self, newPattern):
         '''
         pass the new pattern to the Deformable mirror
         '''
+        self.mirror.setPattern(newPattern)
         print("I received the new pattern!")
 
 
@@ -76,7 +77,7 @@ class Control(inLib.Device):
     def pokeGroup(self, group, offset, quiet=False):
         for s in group:
             self.pokeSegment(s, offset)
-            
+
     def pokeSegment(self, seg, value, pokeAll = False):
         '''
         Add value to a given segment or to all segments
@@ -142,6 +143,7 @@ class Control(inLib.Device):
         '''
         calculate the single mode of Zernike
         Not modulating, just calculate a pattern
+        This one allows the program to receive zernike modes from other programs
         '''
         self.mirror.mask = useMask
         if mode > 0:
@@ -164,8 +166,11 @@ class Control(inLib.Device):
             zcoefs_comp[4:] = zcoefs
         else:
             zcoefs_comp = zcoefs
-        Segs = self.mirror.zernSeg(zcoefs_comp)
-        self.applyToMirror()
+        Segs = self.mirror.zernSeg(zcoefs_comp, conv_seg = True)
+        try:
+            self.applyToMirror()
+        except FileNotFoundError:
+            print("The exe file is not found.")
         return Segs# return the segments
 
     def advancePatternWithPipe(self):
@@ -183,7 +188,7 @@ class Control(inLib.Device):
         self.mirror.exportSegs(self.tempfilename)
 
         #Wait to make sure file exists
-        time.sleep(0.5)
+        time.sleep(0.1)
 
         wTimeStr = str(wtime)
 

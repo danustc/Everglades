@@ -29,6 +29,16 @@ class DM(object):
             MOD = interpolation.zoom(pattern,zoom,order=0,mode='nearest')
             self.pattern = MOD
 
+    # -----------Below are properties
+    @property
+    def mask(self):
+        return self.useMask
+
+    @mask.setter
+    def mask(self, new_status):
+        self.useMask = new_status
+
+
 
     def addOffset(self, seg, value):
         if seg<0:
@@ -86,7 +96,7 @@ class DM(object):
         Take amplitudes of zernike modes and synthesize into a pattern;
         convert into segment patterns.
         """
-        self.pattern = lzern.calc_zernike(z_ampli, self.radius, mask = self.useMask, zern_data = {})
+        self.pattern = lzern.calc_zernike(z_ampli, self.radius, mask = self.mask, zern_data = {})
         if conv_seg:
             return self.findSeg()
         else:
