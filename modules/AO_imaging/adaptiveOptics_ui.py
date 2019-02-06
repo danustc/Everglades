@@ -113,19 +113,6 @@ class UI(inLib.ModuleUI):
             self._ui_control.slm.updateModulationDisplay()
         
 
-
-    def _modulations_toggled(self, state):
-        pass
-        '''
-        if state == False:
-            for m in self._modulations:
-                self._control.setModulationActive(m.index, state)
-        else:
-            self._modulation_toggled(state)
-        if self.hasSLM:
-            self._ui_control.slm.updateModulationDisplay()
-        '''
-
     def set_modulations(self):
         for m in self._modulations:
             state = m.checkbox.isChecked()

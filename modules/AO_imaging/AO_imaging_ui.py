@@ -43,6 +43,8 @@ class UI(inLib.ModuleUI):
         self._ui.pushButton_Acquire.clicked.connect(self.acquirePSF)
         self._ui.pushButtonPhase.clicked.connect(self.retrievePF)
         self._ui.pushButton_save.clicked.connect(self.savePF)
+        self._ui.pushButton_addmod.clicked.connect(self.addModulate)
+        self._ui.pushButton_delmod.clicked.connect(self.removeModulate)
         self._ui.pushButton_ADM.clicked.connect(self.applyToMirror)
 
 
@@ -166,15 +168,51 @@ class UI(inLib.ModuleUI):
         if (guess[0] != 'file') or (guess[0] == 'file' and filename):
             PF, Amp = self._control.retrievePF(pxlSize, l, n, NA, f, guess, nIt, neglect_defocus, invert=invertPF,wavelengths=numWaves, wavestep = dWave, resetAmp=resetAmp,symmeterize=symmeterize)
             self._ui.tabWidget_viewer.setEnabled(True)
-        self._displayPhase(PF)
-        self._displayAmpli(Amp)
+        self.displayPhase(PF)
+        self.displayAmpli(Amp)
         self.use_zernike = False
 
+    def addModulate(self):
+        new_modulation = Modulation(len(self._modulations), self)
+        self._ui.verticalLayoutModulations.insertWidget(0, new_modulation.checkbox)
+        self._modulations.append(new_modulation)
+        self._control.addMOD()
+        
+    def removeModulate(self):
+        '''
+        Check the number of checked modulations
+        '''        
+        mod_list = self.selectModulation()
+        if len(mod_list) > 0:
+            self._control.removeMOD(mod_list)
+        else:
+            print("Please select modulation first.")
+        
+        
 
     def applyToMirror(self):
+        '''
+        1. Find the number of checked modulations
+        2. Synthesize the pattern
+        '''
         #print("The function has not been defined. Please give it a definition.")
-        self._control.modulateMirror()
+        mod_list = self.selectModulation()
+        if len(mod_list) > 0:
+            self._control.modulateMirror(mod_list)
+        else:
+            print("Please select modulation first.")
 
+    def selectModulation(self):
+        '''
+        select modulation from current list
+        '''
+        ic = 0
+        mod_list = []
+        for mod_item in self._modulations:
+            if mod_item.checkbox.isChecked():
+                mod_list.append(ic)
+            ic +=1
+        return mod_list
 
     def savePF(self):
         filename = QtWidgets.QFileDialog.getSaveFileName(None,'Save to file',
@@ -183,8 +221,11 @@ class UI(inLib.ModuleUI):
             self._control.savePF(str(filename))
 
     def unwrap(self):
+        '''
+        This is redundant because we do not need to unwrap.
+        '''
         unwrappedPhase = self._control.unwrap()
-        self._displayPhase(unwrappedPhase)
+        self.displayPhase(unwrappedPhase)
 
 
 

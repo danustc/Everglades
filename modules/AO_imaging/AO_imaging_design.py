@@ -7,7 +7,7 @@
 # WARNING! All changes made in this file will be lost!
 
 from PyQt5 import QtCore, QtGui, QtWidgets
-
+from myWidget.matplotlibwidget import MatplotlibWidget
 class Ui_Form(object):
     def setupUi(self, Form):
         Form.setObjectName("Form")
@@ -486,4 +486,4 @@ class Ui_Form(object):
         self.groupBoxModulations.setTitle(_translate("Form", "Modulations"))
         self.pushButton_ADM.setText(_translate("Form", "Apply!"))
 
-from matplotlibwidget import MatplotlibWidget
+#from matplotlibwidget import MatplotlibWidget

@@ -159,6 +159,12 @@ class Control(inLib.Module):
         np.save(os.path.join(working_dir, filename + '_amplitude.npy'), self._PRcore.get_ampli())
 
 
+    def addMOD(self):
+        print("Current modulation:")
+        
+    def removeMOD(self, rm_list):
+        print("list to be removed:")
+
     def modulateMirror(self):
         '''
         Apply to mirror

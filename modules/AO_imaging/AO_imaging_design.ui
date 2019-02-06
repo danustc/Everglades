@@ -726,7 +726,7 @@
            </sizepolicy>
           </property>
           <property name="text">
-           <string>Amplitude</string>
+           <string/>
           </property>
          </widget>
         </item>
@@ -744,7 +744,7 @@
          </widget>
         </item>
         <item>
-         <widget class="QPushButton" name="pushButton_modulate">
+         <widget class="QPushButton" name="pushButton_addmod">
           <property name="sizePolicy">
            <sizepolicy hsizetype="Minimum" vsizetype="Expanding">
             <horstretch>0</horstretch>
@@ -752,7 +752,7 @@
            </sizepolicy>
           </property>
           <property name="text">
-           <string>Modulate</string>
+           <string>add to mod list</string>
           </property>
          </widget>
         </item>
@@ -859,6 +859,13 @@
          </size>
         </property>
        </spacer>
+      </item>
+      <item>
+       <widget class="QPushButton" name="pushButton_delmod">
+        <property name="text">
+         <string>Remove</string>
+        </property>
+       </widget>
       </item>
       <item>
        <widget class="QPushButton" name="pushButton_ADM">
