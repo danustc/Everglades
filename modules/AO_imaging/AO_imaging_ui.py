@@ -47,7 +47,7 @@ class UI(inLib.ModuleUI):
         self._ui.pushButton_addmod.clicked.connect(self.addModulate)
         self._ui.pushButton_delmod.clicked.connect(self.removeModulate)
         self._ui.pushButton_ADM.clicked.connect(self.applyToMirror)
-
+        self._ui.pushButton_saveconfig.clicked.connect(self.saveConfig)
 
 
         self._ui.labelDisplay.paintEvent = self._labelDisplay_paintEvent
@@ -97,14 +97,12 @@ class UI(inLib.ModuleUI):
         self._ui.mplwidget_phase.figure.axes[0].get_yaxis().set_visible(False)
         self._ui.mplwidget_phase.figure.axes[0].matshow(phase, cmap='RdBu')
         self._ui.mplwidget_phase.draw()
-        
+
     def displayAmpli(self, ampli):
         self._ui.mplwidget_ampli.figure.axes[0].get_xaxis().set_visible(False)
         self._ui.mplwidget_ampli.figure.axes[0].get_yaxis().set_visible(False)
         self._ui.mplwidget_ampli.figure.axes[0].matshow(ampli, cmap='RdBu')
         self._ui.mplwidget_ampli.draw()
-
-        
 
 
     def _updateImSize(self):
@@ -127,7 +125,7 @@ class UI(inLib.ModuleUI):
         self._ui.pushButton_Acquire.setEnabled(False)
         self._scanner.start()
         # if self._scanner.finish():
-        
+
 
 
     def _on_scan_done(self):
@@ -135,9 +133,7 @@ class UI(inLib.ModuleUI):
         self._ui.groupBoxPhase.setEnabled(True)
         time.sleep(1)
         self._updater.start(50)
-        
-     
-   
+ 
     def retrievePF(self):
         '''
         perform phase retrieval
@@ -178,18 +174,23 @@ class UI(inLib.ModuleUI):
         self._ui.verticalLayoutModulations.insertWidget(0, new_modulation.checkbox)
         self._modulations.append(new_modulation)
         self._control.addMOD()
-        
+
+
     def removeModulate(self):
         '''
         Check the number of checked modulations
-        '''        
+        '''
         mod_list = self.selectModulation()
         if len(mod_list) > 0:
+            for idx in mod_list:
+                item = self._modulations[idx].checkbox
+                item.setParent(None)
+                #self._ui.verticalLayoutModulations.removeWidget(widget)
             self._control.removeMOD(mod_list)
         else:
             print("Please select modulation first.")
-        
-        
+
+
 
     def applyToMirror(self):
         '''
@@ -220,6 +221,15 @@ class UI(inLib.ModuleUI):
                                                   '','*.npy')
         if filename:
             self._control.savePF(str(filename))
+
+    def saveConfig(self):
+        '''
+        save configuration into a file
+        '''
+        conf_dest = self._ui.lineEdit_conf.text()
+        if conf_dest == '':
+            exp_destination = QtWidgets.QFileDialog.getOpenFileName(None, 'Open Configuration file:', '', '*.*')[0]
+
 
     def unwrap(self):
         '''
@@ -276,8 +286,14 @@ class Modulation:
     def __init__(self, index, ui):
         self.index = index
         self.checkbox = QtWidgets.QCheckBox(str(self.index))
-        self.checkbox.stateChanged.connect(ui._modulation_toggled)
+        self.checkbox.stateChanged.connect(ui.selectModulation)
         self.checkbox.toggle()
+
+    def index_update(self, new_idx):
+        '''
+        if some checkboxes are removed, update the indices of the rest accordingly.
+        '''
+        pass
 
 
 
@@ -285,7 +301,7 @@ class Scanner(QtCore.QThread):
 
     def __init__(self, control, range_, nSlices, nFrames, center_xy, imagedest, maskRadius, maskCenter):
         QtCore.QThread.__init__(self)
- 
+
         self.control = control
         self.range_ = range_
         self.nSlices = nSlices
@@ -294,7 +310,6 @@ class Scanner(QtCore.QThread):
         self.imagedest = imagedest
         self.maskRadius = maskRadius
         self.maskCenter = maskCenter
-        
 
 
     def run(self):
