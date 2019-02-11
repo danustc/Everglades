@@ -33,7 +33,8 @@ class UI(inLib.ModuleUI):
         self._ui.buttonGroupGuess.addButton(self._ui.radioButtonPlane)
         self._ui.buttonGroupGuess.addButton(self._ui.radioButtonMirror)
         self._ui.buttonGroupGuess.addButton(self._ui.radioButtonFromFile)
-        
+
+
         self._ui.doubleSpinBoxRange.setValue(self._control._settings['range'])
         self._ui.spinBoxSlices.setValue(self._control._settings['nSlices'])
         self._ui.spinBoxFrames.setValue(self._control._settings['nFrames'])
@@ -240,7 +241,7 @@ class UI(inLib.ModuleUI):
             if self._autoscale:
                 self.vmin = np_min
                 self.vmax = np_max
-            
+
             if self.vmin==self.vmax or self.vmin>self.vmax:
                 self.vmax = 1+self.vmin
             qt_image = qext.numpy_to_qimage8(np_image, self.vmin, self.vmax, self._cmap)
@@ -252,13 +253,13 @@ class UI(inLib.ModuleUI):
             #if self._ui.checkBox_showTarget.isChecked():
             #    self._drawTarget()
             self._ui.labelDisplay.update()
-            
+
+
     def _labelDisplay_paintEvent(self, event):
         qp = QtGui.QPainter(self._ui.labelDisplay)
         if self._pixmap != None:
             qp.drawPixmap(0,0,self._pixmap)
         qp.setPen(QtCore.Qt.red)
-        
 
     def _mousePressEvent(self,x,y):
         self.x = int(x*(self._yres/512.))
@@ -284,7 +285,7 @@ class Scanner(QtCore.QThread):
 
     def __init__(self, control, range_, nSlices, nFrames, center_xy, imagedest, maskRadius, maskCenter):
         QtCore.QThread.__init__(self)
-        
+ 
         self.control = control
         self.range_ = range_
         self.nSlices = nSlices
