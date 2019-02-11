@@ -102,10 +102,10 @@ class Control(inLib.Module):
         nz, ny, nx = scan.shape
         # An empty PSF
         PSF = np.zeros_like(scan)
-        self._PSF = PSF # reset the psf
+        self._PSF = scan# reset the psf
         if filename:
-            np.save(filename, PSF)
-        return PSF
+            np.save(filename, scan)
+        return scan 
     
     
 

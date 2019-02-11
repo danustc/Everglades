@@ -7,7 +7,7 @@
 # WARNING! All changes made in this file will be lost!
 
 from PyQt5 import QtCore, QtGui, QtWidgets
-
+from myWidget.matplotlibwidget import MatplotlibWidget
 class Ui_Form(object):
     def setupUi(self, Form):
         Form.setObjectName("Form")
@@ -490,4 +490,3 @@ class Ui_Form(object):
         self.pushButton_delmod.setText(_translate("Form", "Remove"))
         self.pushButton_ADM.setText(_translate("Form", "Apply!"))
 
-from matplotlibwidget import MatplotlibWidget

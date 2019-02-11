@@ -4,9 +4,9 @@ devices:
     syringePumps:
         manufacturer: harvardapparatus
         model: pump
-        active: false 
+        active: true 
         settings:
-            port: COM11
+            port: COM8
 
     mirror:
         active: true
@@ -71,10 +71,10 @@ devices:
     lasers:
         manufacturer: coherent
         model: obis
-        active: false
+        active: true 
         settings:
-            ports: ["COM15","COM14","COM13"] #com15:405; com13:647; com14:488
-            lines: [405, 488, 647]
+            ports: ["COM4","COM7"] #com15:405; com13:647; com14:488
+            lines: [488, 561]
     camera:
         manufacturer: hamamatsu
         model: orcaflash
