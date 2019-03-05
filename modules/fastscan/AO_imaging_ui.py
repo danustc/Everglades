@@ -26,13 +26,8 @@ def clickable(widget):
 class UI(inLib.ModuleUI):
 
     def __init__(self, control, ui_control):
-        design_path = 'modules.AO_imaging.AO_imaging_design'
+        design_path = 'modules.fastscan.fastscan_design'
         inLib.ModuleUI.__init__(self, control, ui_control, design_path)
-
-        self._ui.buttonGroupGuess = QtWidgets.QButtonGroup()
-        self._ui.buttonGroupGuess.addButton(self._ui.radioButtonPlane)
-        self._ui.buttonGroupGuess.addButton(self._ui.radioButtonMirror)
-        self._ui.buttonGroupGuess.addButton(self._ui.radioButtonFromFile)
 
 
         self._ui.doubleSpinBoxRange.setValue(self._control._settings['range'])

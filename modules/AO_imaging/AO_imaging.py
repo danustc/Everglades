@@ -23,7 +23,7 @@ GS = 'plane'
 class Control(inLib.Module):
 
     def __init__(self, control, settings):
-        print('Initializing AO imaging module.') 
+        print('Initializing AO imaging module.')
         inLib.Module.__init__(self, control, settings)
         self._modulations = []
         print('AO imaging module initialized.')
