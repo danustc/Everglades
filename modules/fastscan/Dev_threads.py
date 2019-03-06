@@ -5,18 +5,20 @@ Created by Dan on 12/15/2016.
 
 from PyQt5 import QtGui,QtCore
 import numpy as np
+import time
 
 
 class stage_mover(QtCore.QThread):
 
-    def __init__(self, control):
+    def __init__(self, control, x_init, x_relative):
         QtCore.QThread.__init__(self)
         self.control = control
+        self.x_init = x_init
+        self.x_relative = x_relative
 
     def run(self):
-        self.control.moveTo(self.range_, self.nSlices, self.nFrames,
-                                self.center_xy, self.fname,
-                                self.maskRadius, self.maskCenter)
+        self.control.moveTo(self.x_init,10.0) # initial position
+        time.sleep(10.0)
     # done with Scanner
 
 

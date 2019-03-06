@@ -29,13 +29,32 @@ class UI(inLib.ModuleUI):
     def __init__(self, control, ui_control):
         design_path = 'modules.fastscan.fastscan_design'
         inLib.ModuleUI__init__(self, control, ui_control, design_path)
+        self._ui.pushButton_seta.clicked.connect(self.initial)
+
+
 
         self.stage_thread = None
         self.cam_thread = None
         self.exp_time = 50.0 # miliseconds
 
 
+    def set_initial(self):
+        '''
+        0. get the stage position from the stage device
+        1. save current position as self.init
+        '''
+        cx, cy = self._control.getPosition()
+
+
+
+
+
     def quick_scan(self):
+        # Initialize the position
+        self._control.moveTo()
+
+
+
         self.stage_thread = stage_mover(self._control, self.destination)
         self.cam_thread = TL_acquisition(self._control, self.exp_time)
 

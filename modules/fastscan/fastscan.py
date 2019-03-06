@@ -20,16 +20,19 @@ class Control(inLib.Module):
         '''
         return self._control.camera.getDimensions()
 
+    def getPosition(self):
+        '''
+        get current motor stage position
+        '''
 
-    def moveTo(self, dest, speed = None):
+
+    def moveTo(self, dest, speed ):
         '''
         move the stage to a certain position
+        speed in the unit of mm/s
         '''
         dx, dy = dest
-        print("Stage moved!")
-        if speed is not None:
-            self._control.stage.setSpeed('x', speed)
-
+        self._control.stage.setSpeed('x', speed)
         self._control.stage.goAbsolute(dx, dy)
 
 
